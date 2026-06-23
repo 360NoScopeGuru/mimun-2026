@@ -1,0 +1,72 @@
+@import 'tailwindcss';
+@plugin '@tailwindcss/typography';
+
+@theme {
+	--font-sans:
+		-apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif;
+
+	--color-ink-950: #08090b;
+	--color-ink-900: #0d0f12;
+	--color-ink-800: #14171b;
+	--color-ink-700: #1c2026;
+	--color-ink-600: #2a2f37;
+	--color-ink-500: #454c56;
+	--color-ink-400: #6b7280;
+	--color-ink-300: #9aa1ac;
+	--color-ink-200: #c4c9d1;
+	--color-ink-100: #e7e9ed;
+	--color-ink-50: #f7f8fa;
+
+	--color-accent-500: #3b82f6;
+	--color-accent-400: #5b9bf8;
+	--color-accent-300: #8fbafb;
+	--color-accent-glow: #3b82f64d;
+
+	--color-signal-green: #34d399;
+	--color-signal-amber: #fbbf24;
+	--color-signal-red: #f87171;
+}
+
+:root {
+	color-scheme: dark;
+}
+
+body {
+	background: var(--color-ink-950);
+	color: var(--color-ink-100);
+	font-family: var(--font-sans);
+	font-feature-settings: 'ss01' on, 'ss02' on;
+	letter-spacing: -0.011em;
+	-webkit-font-smoothing: antialiased;
+}
+
+::selection {
+	background: var(--color-accent-glow);
+}
+
+.glass-panel {
+	background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.015));
+	border: 1px solid rgba(255, 255, 255, 0.07);
+	backdrop-filter: blur(20px);
+}
+
+.focus-ring {
+	outline: none;
+}
+.focus-ring:focus-visible {
+	outline: 2px solid var(--color-accent-400);
+	outline-offset: 2px;
+}
+
+@keyframes pulse-dot {
+	0%,
+	100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.35;
+	}
+}
+.pulse-dot {
+	animation: pulse-dot 1.6s ease-in-out infinite;
+}
