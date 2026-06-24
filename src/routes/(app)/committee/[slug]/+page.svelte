@@ -135,6 +135,7 @@
 			<h1 class="display mt-0.5 truncate text-lg text-ink-50">{data.committee.name}</h1>
 		</div>
 		<div class="flex items-center gap-4">
+			<a href="/committee/{data.committee.slug}/documents" class="hidden text-xs text-ink-400 transition-colors hover:text-brass-300 sm:block">Documents</a>
 			{#if floor.mode === 'moderated_caucus' || floor.mode === 'unmoderated_caucus'}
 				<div class="rounded-lg border border-brass-600/30 bg-brass-500/[0.08] px-3 py-1.5">
 					<Timer endsAt={floor.caucusTimerEndsAt} label="Caucus" />

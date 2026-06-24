@@ -1,4 +1,11 @@
-import { pgTable, text, timestamp, integer, uuid, jsonb, pgEnum, unique } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, integer, uuid, jsonb, pgEnum, unique, customType } from 'drizzle-orm/pg-core';
+
+// Raw binary column for storing uploaded files (position papers, committee docs).
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+	dataType() {
+		return 'bytea';
+	}
+});
 
 /* ------------------------------------------------------------------ *
  * Enums
@@ -57,6 +64,8 @@ export const sponsorRole = pgEnum('sponsor_role', ['main_submitter', 'co_submitt
 export const amendmentType = pgEnum('amendment_type', ['friendly', 'unfriendly']);
 export const amendmentAction = pgEnum('amendment_action', ['add', 'amend', 'strike']);
 export const amendmentStatus = pgEnum('amendment_status', ['proposed', 'accepted', 'voting', 'passed', 'failed', 'withdrawn']);
+
+export const fileKind = pgEnum('file_kind', ['position_paper', 'background_guide', 'rop', 'agenda', 'study_guide', 'other']);
 
 /* ------------------------------------------------------------------ *
  * Tenancy
@@ -323,5 +332,29 @@ export const auditLog = pgTable('audit_log', {
 	actorId: uuid('actor_id').references(() => delegates.id),
 	action: text('action').notNull(),
 	detail: jsonb('detail').$type<Record<string, unknown>>().notNull().default({}),
+	createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+});
+
+/* ------------------------------------------------------------------ *
+ * Documents & position papers
+ * ------------------------------------------------------------------ */
+
+// Uploaded files, stored as bytea on Postgres (swappable for Vercel Blob later).
+export const files = pgTable('files', {
+	id: uuid('id').defaultRandom().primaryKey(),
+	committeeId: uuid('committee_id')
+		.notNull()
+		.references(() => committees.id),
+	kind: fileKind('kind').notNull(),
+	title: text('title').notNull().default(''),
+	fileName: text('file_name').notNull(),
+	mime: text('mime').notNull(),
+	sizeBytes: integer('size_bytes').notNull(),
+	bytes: bytea('bytes').notNull(),
+	// For position papers: the delegation it belongs to. Also the uploader.
+	delegateId: uuid('delegate_id').references(() => delegates.id),
+	uploadedById: uuid('uploaded_by_id')
+		.notNull()
+		.references(() => delegates.id),
 	createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 });
