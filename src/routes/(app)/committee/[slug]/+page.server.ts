@@ -1,19 +1,9 @@
-import { error, fail } from '@sveltejs/kit';
+import { fail } from '@sveltejs/kit';
 import { and, asc, eq } from 'drizzle-orm';
 import type { Actions, PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
 import { committees, messages, speakerQueue, delegates } from '$lib/server/db/schema';
-
-async function loadCommittee(slug: string) {
-	const [committee] = await db.select().from(committees).where(eq(committees.slug, slug));
-	if (!committee) error(404, 'Committee not found');
-	return committee;
-}
-
-function assertMember(delegate: App.Locals['delegate'], committeeId: string) {
-	if (!delegate) error(401);
-	if (delegate.role !== 'admin' && delegate.committeeId !== committeeId) error(403, 'Not a member of this committee');
-}
+import { loadCommittee, assertMember, assertChair } from '$lib/server/auth/guards';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
 	const committee = await loadCommittee(params.slug);
@@ -47,8 +37,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 export const actions: Actions = {
 	sendMessage: async ({ request, locals, params }) => {
 		const committee = await loadCommittee(params.slug);
-		assertMember(locals.delegate, committee.id);
-		const delegate = locals.delegate!;
+		const delegate = assertMember(locals.delegate, committee.id);
 
 		const form = await request.formData();
 		const body = String(form.get('body') ?? '').trim();
@@ -62,8 +51,7 @@ export const actions: Actions = {
 
 	joinQueue: async ({ locals, params }) => {
 		const committee = await loadCommittee(params.slug);
-		assertMember(locals.delegate, committee.id);
-		const delegate = locals.delegate!;
+		const delegate = assertMember(locals.delegate, committee.id);
 
 		const existing = await db
 			.select()
@@ -78,8 +66,7 @@ export const actions: Actions = {
 
 	leaveQueue: async ({ locals, params }) => {
 		const committee = await loadCommittee(params.slug);
-		assertMember(locals.delegate, committee.id);
-		const delegate = locals.delegate!;
+		const delegate = assertMember(locals.delegate, committee.id);
 
 		await db
 			.update(speakerQueue)
@@ -91,9 +78,7 @@ export const actions: Actions = {
 
 	callNext: async ({ locals, params }) => {
 		const committee = await loadCommittee(params.slug);
-		const delegate = locals.delegate!;
-		if (delegate.role === 'delegate') error(403, 'Chair only');
-		assertMember(delegate, committee.id);
+		assertChair(locals.delegate, committee.id);
 
 		await db
 			.update(speakerQueue)
@@ -117,9 +102,7 @@ export const actions: Actions = {
 
 	setStatus: async ({ request, locals, params }) => {
 		const committee = await loadCommittee(params.slug);
-		const delegate = locals.delegate!;
-		if (delegate.role === 'delegate') error(403, 'Chair only');
-		assertMember(delegate, committee.id);
+		assertChair(locals.delegate, committee.id);
 
 		const form = await request.formData();
 		const status = String(form.get('status') ?? '');
