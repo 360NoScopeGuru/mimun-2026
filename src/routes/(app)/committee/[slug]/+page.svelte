@@ -21,6 +21,31 @@
 	let vote = $state(data.state.vote);
 	let resolution = $state(data.state.resolution);
 	let cstatus = $state(data.state.status);
+	let pendingMotions = $state(data.state.pendingMotions);
+	let points = $state(data.state.points);
+
+	const num = (v: unknown): number | null => (typeof v === 'number' ? v : null);
+	const str = (v: unknown): string => (typeof v === 'string' ? v : '');
+
+	const motionOptions: [string, string][] = [
+		['moderated_caucus', 'Moderated caucus'],
+		['unmoderated_caucus', 'Unmoderated caucus'],
+		['extend_debate', 'Extend debate'],
+		['close_debate', 'Close debate → vote'],
+		['introduce_resolution', 'Introduce resolution']
+	];
+	const pointOptions: [string, string][] = [
+		['parliamentary_inquiry', 'Parliamentary inquiry'],
+		['information', 'Point of information'],
+		['order', 'Point of order'],
+		['personal_privilege', 'Personal privilege']
+	];
+	const pointLabel: Record<string, string> = {
+		order: 'Point of order',
+		information: 'Point of information',
+		personal_privilege: 'Personal privilege',
+		parliamentary_inquiry: 'Parliamentary inquiry'
+	};
 
 	let messageInput = $state('');
 	let sending = $state(false);
@@ -70,6 +95,8 @@
 		vote = u.vote;
 		resolution = u.resolution;
 		cstatus = u.status;
+		pendingMotions = u.pendingMotions;
+		points = u.points;
 	}
 
 	// Re-poll immediately after a floor-changing action so the room feels live.
@@ -271,6 +298,65 @@
 					<form method="POST" action={inQueue ? '?/leaveQueue' : '?/joinQueue'} use:enhance={refresh} class="mt-3">
 						<button class="btn focus-ring w-full {inQueue ? 'btn-ghost' : 'btn-brass'}">{inQueue ? 'Withdraw from the list' : 'Request to speak'}</button>
 					</form>
+				{/if}
+			</div>
+
+			<!-- Motions & points on the floor -->
+			<div class="border-b border-white/[0.07] px-5 py-4">
+				<p class="label label-brass mb-3">On the floor</p>
+
+				{#if pendingMotions.length}
+					<ul class="space-y-2">
+						{#each pendingMotions as m (m.id)}
+							<li class="rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
+								<p class="text-sm text-ink-100">{m.label}</p>
+								<p class="text-xs text-ink-500">
+									{m.proposerCountry || m.proposer}{#if num(m.params.totalSeconds)} · {Math.round(num(m.params.totalSeconds)! / 60)} min{/if}{#if str(m.params.topic)} · {str(m.params.topic)}{/if}
+								</p>
+								{#if isChair}
+									<div class="mt-2 flex gap-1.5">
+										<form method="POST" action="?/entertainMotion" use:enhance={refresh}><input type="hidden" name="motionId" value={m.id} /><button class="btn btn-brass focus-ring px-2 py-1 text-[0.65rem]">Put to vote</button></form>
+										<form method="POST" action="?/adoptMotion" use:enhance={refresh}><input type="hidden" name="motionId" value={m.id} /><button class="btn btn-ghost focus-ring px-2 py-1 text-[0.65rem]">Adopt</button></form>
+										<form method="POST" action="?/ruleMotion" use:enhance={refresh}><input type="hidden" name="motionId" value={m.id} /><button class="btn btn-quiet focus-ring px-2 py-1 text-[0.65rem]">Dismiss</button></form>
+									</div>
+								{/if}
+							</li>
+						{/each}
+					</ul>
+				{:else}
+					<p class="text-sm text-ink-500">No motions pending.</p>
+				{/if}
+
+				{#if points.length}
+					<div class="mt-3 space-y-1 border-t border-white/[0.06] pt-3">
+						{#each points as p (p.id)}
+							<p class="text-xs text-ink-400"><span class="text-brass-400">{pointLabel[p.type]}</span> — {p.byCountry || p.by}{#if p.body}: {p.body}{/if}</p>
+						{/each}
+					</div>
+				{/if}
+
+				{#if !isChair}
+					<details class="mt-3">
+						<summary class="cursor-pointer text-xs text-brass-400">Raise a motion or point</summary>
+						<form method="POST" action="?/raiseMotion" use:enhance={refresh} class="mt-2 rounded-lg border border-white/[0.07] p-3">
+							<select name="type" class="input py-1.5 text-xs">
+								{#each motionOptions as [v, t] (v)}<option value={v}>{t}</option>{/each}
+							</select>
+							<div class="mt-2 flex gap-2">
+								<input name="totalSeconds" type="number" min="30" max="3600" value="600" class="input w-20 py-1.5 text-xs" title="Seconds" />
+								<input name="topic" placeholder="Topic (optional)" class="input flex-1 py-1.5 text-xs" />
+							</div>
+							{#if resolution}<input type="hidden" name="targetResolutionId" value={resolution.id} />{/if}
+							<button class="btn btn-ghost focus-ring mt-2 w-full py-1.5 text-xs">Raise motion</button>
+						</form>
+						<form method="POST" action="?/raisePoint" use:enhance={refresh} class="mt-2 rounded-lg border border-white/[0.07] p-3">
+							<select name="type" class="input py-1.5 text-xs">
+								{#each pointOptions as [v, t] (v)}<option value={v}>{t}</option>{/each}
+							</select>
+							<input name="body" placeholder="Detail (optional)" class="input mt-2 py-1.5 text-xs" />
+							<button class="btn btn-ghost focus-ring mt-2 w-full py-1.5 text-xs">Raise point</button>
+						</form>
+					</details>
 				{/if}
 			</div>
 

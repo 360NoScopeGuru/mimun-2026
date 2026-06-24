@@ -9,12 +9,15 @@ import {
 	attendance,
 	committeeFloor,
 	motions,
+	points,
 	votes,
-	ballots
+	ballots,
+	resolutions
 } from '$lib/server/db/schema';
 import { loadCommittee, assertMember, assertChair } from '$lib/server/auth/guards';
 import { getCommitteeState } from '$lib/server/committeeState';
-import { presetFor, tallyBallots, decide, type BallotChoice } from '$lib/server/procedure';
+import { presetFor, tallyBallots, decide, motionDef, motionPrecedence, type BallotChoice } from '$lib/server/procedure';
+import { executeMotion } from '$lib/server/floor';
 import { audit } from '$lib/server/audit';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
@@ -93,17 +96,23 @@ export const actions: Actions = {
 		const form = await request.formData();
 		const voteId = String(form.get('voteId') ?? '');
 		const choice = String(form.get('choice') ?? '');
-		if (!['for', 'against', 'abstain'].includes(choice)) return fail(400, { message: 'Invalid choice' });
 
 		const [vote] = await db.select().from(votes).where(and(eq(votes.id, voteId), eq(votes.committeeId, committee.id)));
 		if (!vote || vote.status !== 'open') return fail(400, { message: 'No open vote' });
 
-		// Only present-and-voting delegates may vote.
+		const allowed = vote.method === 'roll_call' ? ['for', 'against', 'abstain', 'pass'] : ['for', 'against', 'abstain'];
+		if (!allowed.includes(choice)) return fail(400, { message: 'Invalid choice' });
+
+		// Procedural votes: any present delegation. Substantive votes: present and voting only.
 		const [att] = await db
 			.select()
 			.from(attendance)
 			.where(and(eq(attendance.committeeId, committee.id), eq(attendance.delegateId, delegate.id)));
-		if (!att || att.status !== 'present_and_voting') return fail(403, { message: 'You are not present and voting' });
+		if (vote.kind === 'substantive') {
+			if (!att || att.status !== 'present_and_voting') return fail(403, { message: 'Only present-and-voting delegations may vote' });
+		} else if (!att || att.status === 'absent') {
+			return fail(403, { message: 'You must be present to vote' });
+		}
 
 		await db
 			.insert(ballots)
@@ -257,9 +266,101 @@ export const actions: Actions = {
 			.update(votes)
 			.set({ status: 'closed', result, tallyFor: t.for, tallyAgainst: t.against, tallyAbstain: t.abstain, closesAt: new Date() })
 			.where(eq(votes.id, vote.id));
+
+		// Default: return to formal debate (executeMotion below may override the mode).
 		await db.update(committeeFloor).set({ mode: 'formal_debate', updatedAt: new Date() }).where(eq(committeeFloor.committeeId, committee.id));
-		await audit(committee, chair.id, 'close_vote', { voteId: vote.id, result, tally: t });
+
+		// Apply the outcome to the subject.
+		if (vote.subjectType === 'motion' && vote.subjectId) {
+			const [m] = await db.select().from(motions).where(eq(motions.id, vote.subjectId));
+			if (m) {
+				await db.update(motions).set({ status: result === 'passed' ? 'passed' : 'failed', decidedAt: new Date() }).where(eq(motions.id, m.id));
+				if (result === 'passed') await executeMotion(committee, m);
+			}
+		} else if (vote.subjectType === 'resolution' && vote.subjectId) {
+			await db.update(resolutions).set({ status: result === 'passed' ? 'adopted' : 'failed' }).where(eq(resolutions.id, vote.subjectId));
+		}
+
+		await audit(committee, chair.id, 'close_vote', { voteId: vote.id, subjectType: vote.subjectType, result, tally: t });
 		return { success: true, result };
+	},
+
+	// A delegate raises a motion onto the precedence-ordered queue.
+	raiseMotion: async ({ request, locals, params }) => {
+		const committee = await loadCommittee(params.slug);
+		const delegate = assertMember(locals.delegate, committee.id);
+
+		const form = await request.formData();
+		const type = String(form.get('type') ?? '');
+		if (!motionDef(type)) return fail(400, { message: 'Unknown motion' });
+
+		const mp: Record<string, unknown> = {};
+		const totalSeconds = Number(form.get('totalSeconds'));
+		if (totalSeconds) mp.totalSeconds = Math.min(3600, Math.max(30, totalSeconds));
+		const topic = String(form.get('topic') ?? '').slice(0, 200);
+		if (topic) mp.topic = topic;
+		const targetResolutionId = String(form.get('targetResolutionId') ?? '');
+		if (targetResolutionId) mp.targetResolutionId = targetResolutionId;
+		const extendSeconds = Number(form.get('extendSeconds'));
+		if (extendSeconds) mp.extendSeconds = Math.min(1800, Math.max(30, extendSeconds));
+
+		await db.insert(motions).values({ committeeId: committee.id, proposedById: delegate.id, type: type as typeof motions.$inferInsert.type, params: mp, status: 'proposed', precedenceRank: motionPrecedence(type) });
+		return { success: true };
+	},
+
+	raisePoint: async ({ request, locals, params }) => {
+		const committee = await loadCommittee(params.slug);
+		const delegate = assertMember(locals.delegate, committee.id);
+
+		const form = await request.formData();
+		const type = String(form.get('type') ?? '');
+		if (!['order', 'information', 'personal_privilege', 'parliamentary_inquiry'].includes(type)) return fail(400);
+		const body = String(form.get('body') ?? '').slice(0, 300);
+
+		await db.insert(points).values({ committeeId: committee.id, byId: delegate.id, type: type as 'order', body });
+		return { success: true };
+	},
+
+	// Chair puts a pending motion to a procedural vote.
+	entertainMotion: async ({ request, locals, params }) => {
+		const committee = await loadCommittee(params.slug);
+		const chair = assertChair(locals.delegate, committee.id);
+
+		const motionId = String((await request.formData()).get('motionId') ?? '');
+		const [m] = await db.select().from(motions).where(and(eq(motions.id, motionId), eq(motions.committeeId, committee.id)));
+		if (!m || m.status !== 'proposed') return fail(400);
+
+		await db.update(votes).set({ status: 'closed', closesAt: new Date() }).where(and(eq(votes.committeeId, committee.id), eq(votes.status, 'open')));
+		await db.update(motions).set({ status: 'voting' }).where(eq(motions.id, m.id));
+		await db.insert(votes).values({ committeeId: committee.id, subjectType: 'motion', subjectId: m.id, label: motionDef(m.type)?.label ?? 'Motion', kind: 'procedural', majorityRule: 'simple', method: 'placard', status: 'open' });
+		await db.update(committeeFloor).set({ mode: 'voting', updatedAt: new Date() }).where(eq(committeeFloor.committeeId, committee.id));
+		await audit(committee, chair.id, 'entertain_motion', { motionId: m.id, type: m.type });
+		return { success: true };
+	},
+
+	// Chair override: adopt a motion by unanimous consent (no vote).
+	adoptMotion: async ({ request, locals, params }) => {
+		const committee = await loadCommittee(params.slug);
+		const chair = assertChair(locals.delegate, committee.id);
+
+		const motionId = String((await request.formData()).get('motionId') ?? '');
+		const [m] = await db.select().from(motions).where(and(eq(motions.id, motionId), eq(motions.committeeId, committee.id)));
+		if (!m || m.status !== 'proposed') return fail(400);
+
+		await db.update(motions).set({ status: 'passed', decidedAt: new Date() }).where(eq(motions.id, m.id));
+		await executeMotion(committee, m);
+		await audit(committee, chair.id, 'adopt_motion_by_consent', { motionId: m.id, type: m.type });
+		return { success: true };
+	},
+
+	ruleMotion: async ({ request, locals, params }) => {
+		const committee = await loadCommittee(params.slug);
+		const chair = assertChair(locals.delegate, committee.id);
+
+		const motionId = String((await request.formData()).get('motionId') ?? '');
+		await db.update(motions).set({ status: 'withdrawn', decidedAt: new Date() }).where(and(eq(motions.id, motionId), eq(motions.committeeId, committee.id), eq(motions.status, 'proposed')));
+		await audit(committee, chair.id, 'rule_motion_out_of_order', { motionId });
+		return { success: true };
 	},
 
 	setStatus: async ({ request, locals, params }) => {

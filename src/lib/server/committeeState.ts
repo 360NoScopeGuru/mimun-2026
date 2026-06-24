@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, isNull } from 'drizzle-orm';
 import { db } from './db';
 import {
 	committees,
@@ -10,9 +10,10 @@ import {
 	votes,
 	ballots,
 	motions,
+	points,
 	resolutions
 } from './db/schema';
-import { presetFor, tallyBallots, quorumThreshold, hasQuorum, type BallotChoice } from './procedure';
+import { presetFor, tallyBallots, quorumThreshold, hasQuorum, sortByPrecedence, motionDef, type BallotChoice } from './procedure';
 
 type Committee = typeof committees.$inferSelect;
 type Delegate = typeof delegates.$inferSelect;
@@ -40,7 +41,7 @@ export async function getCommitteeState(committee: Committee, delegate: Delegate
 
 	const [floorRow] = await db.select().from(committeeFloor).where(eq(committeeFloor.committeeId, committee.id));
 
-	const [messageRows, queueRows, roster, attendanceRows, openVote, latestResolution] = await Promise.all([
+	const [messageRows, queueRows, roster, attendanceRows, openVote, latestResolution, pendingMotionRows, pointRows] = await Promise.all([
 		db
 			.select({ id: messages.id, body: messages.body, createdAt: messages.createdAt, author: delegates.fullName, country: delegates.country, role: delegates.role })
 			.from(messages)
@@ -74,7 +75,19 @@ export async function getCommitteeState(committee: Committee, delegate: Delegate
 			.from(resolutions)
 			.where(eq(resolutions.committeeId, committee.id))
 			.orderBy(desc(resolutions.createdAt))
-			.limit(1)
+			.limit(1),
+		db
+			.select({ id: motions.id, type: motions.type, params: motions.params, createdAt: motions.createdAt, proposer: delegates.fullName, proposerCountry: delegates.country })
+			.from(motions)
+			.innerJoin(delegates, eq(motions.proposedById, delegates.id))
+			.where(and(eq(motions.committeeId, committee.id), eq(motions.status, 'proposed'))),
+		db
+			.select({ id: points.id, type: points.type, body: points.body, createdAt: points.createdAt, by: delegates.fullName, byCountry: delegates.country })
+			.from(points)
+			.innerJoin(delegates, eq(points.byId, delegates.id))
+			.where(and(eq(points.committeeId, committee.id), isNull(points.resolvedAt)))
+			.orderBy(desc(points.createdAt))
+			.limit(10)
 	]);
 
 	// Current speaker (if any)
@@ -146,7 +159,16 @@ export async function getCommitteeState(committee: Committee, delegate: Delegate
 			mine
 		},
 		vote,
-		resolution: latestResolution[0] ?? null
+		resolution: latestResolution[0] ?? null,
+		pendingMotions: sortByPrecedence(pendingMotionRows).map((m) => ({
+			id: m.id,
+			type: m.type,
+			label: motionDef(m.type)?.label ?? m.type,
+			params: m.params as Record<string, unknown>,
+			proposer: m.proposer,
+			proposerCountry: m.proposerCountry
+		})),
+		points: pointRows
 	};
 }
 
