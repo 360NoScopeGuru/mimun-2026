@@ -57,7 +57,12 @@
 	);
 
 	const inQueue = $derived(queue.some((q) => q.delegateId === me.id));
-	const canVote = $derived(att.mine === 'present_and_voting');
+	const canVote = $derived(vote ? (vote.kind === 'substantive' ? att.mine === 'present_and_voting' : att.mine !== 'absent') : false);
+	const voteChoices = $derived<[string, string][]>(
+		vote?.method === 'roll_call'
+			? [['for', 'For'], ['against', 'Against'], ['abstain', 'Abstain'], ['pass', 'Pass']]
+			: [['for', 'For'], ['against', 'Against'], ['abstain', 'Abstain']]
+	);
 
 	const roleLabel: Record<string, string> = { chair: 'Chair', deputy_chair: 'Deputy Chair', admin: 'Secretariat', secretariat: 'Secretariat' };
 	const affiliation = (country: string, role?: string) => country || (role ? (roleLabel[role] ?? '') : '');
@@ -222,7 +227,12 @@
 			<!-- Open vote -->
 			{#if vote}
 				<div class="border-b border-white/[0.07] px-5 py-4">
-					<p class="label label-brass mb-1">Vote in progress</p>
+					<div class="mb-1 flex items-center justify-between">
+						<p class="label label-brass">Vote in progress</p>
+						<span class="label text-[0.6rem] text-ink-500">
+							{vote.method === 'roll_call' ? 'Roll call' : 'Placard'}{vote.round > 1 ? ` · Round ${vote.round}` : ''} · {vote.majorityRule === 'two_thirds' ? '⅔' : 'simple'}
+						</span>
+					</div>
 					<p class="mb-3 text-sm text-ink-100">{vote.label}</p>
 
 					<div class="space-y-1.5">
@@ -235,12 +245,15 @@
 								<span class="w-6 text-right font-mono text-xs tabular-nums text-ink-200">{vote.tally[key as 'for']}</span>
 							</div>
 						{/each}
+						{#if vote.tally.pass > 0}
+							<p class="text-[0.7rem] text-signal-amber">{vote.tally.pass} passing — must vote next round</p>
+						{/if}
 					</div>
 
 					{#if !isChair}
 						{#if canVote}
-							<div class="mt-3 grid grid-cols-3 gap-2">
-								{#each [['for', 'For'], ['against', 'Against'], ['abstain', 'Abstain']] as [choice, text] (choice)}
+							<div class="mt-3 grid {voteChoices.length === 4 ? 'grid-cols-4' : 'grid-cols-3'} gap-1.5">
+								{#each voteChoices as [choice, text] (choice)}
 									<form method="POST" action="?/castBallot" use:enhance={refresh}>
 										<input type="hidden" name="voteId" value={vote.id} />
 										<input type="hidden" name="choice" value={choice} />
@@ -249,13 +262,21 @@
 								{/each}
 							</div>
 						{:else}
-							<p class="mt-3 text-xs text-ink-500">Only present-and-voting delegations may vote.</p>
+							<p class="mt-3 text-xs text-ink-500">{vote.kind === 'substantive' ? 'Only present-and-voting delegations may vote.' : 'You must be present to vote.'}</p>
 						{/if}
 					{:else}
-						<form method="POST" action="?/closeVote" use:enhance={refresh} class="mt-3">
-							<input type="hidden" name="voteId" value={vote.id} />
-							<button class="btn btn-brass focus-ring w-full py-2 text-xs">Close vote &amp; announce</button>
-						</form>
+						<div class="mt-3 flex gap-2">
+							{#if vote.method === 'roll_call' && vote.tally.pass > 0}
+								<form method="POST" action="?/advanceRound" use:enhance={refresh} class="flex-1">
+									<input type="hidden" name="voteId" value={vote.id} />
+									<button class="btn btn-ghost focus-ring w-full py-2 text-xs">Second round</button>
+								</form>
+							{/if}
+							<form method="POST" action="?/closeVote" use:enhance={refresh} class="flex-1">
+								<input type="hidden" name="voteId" value={vote.id} />
+								<button class="btn btn-brass focus-ring w-full py-2 text-xs">Close &amp; announce</button>
+							</form>
+						</div>
 					{/if}
 				</div>
 			{/if}

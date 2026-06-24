@@ -110,12 +110,15 @@ export async function getCommitteeState(committee: Committee, delegate: Delegate
 	let vote = null;
 	if (openVote[0]) {
 		const v = openVote[0];
+		// Count each delegation's latest ballot across rounds (roll-call second rounds).
 		const cast = await db
-			.select({ delegateId: ballots.delegateId, choice: ballots.choice })
+			.select({ delegateId: ballots.delegateId, choice: ballots.choice, round: ballots.round })
 			.from(ballots)
-			.where(and(eq(ballots.voteId, v.id), eq(ballots.round, v.round)));
-		const tally = tallyBallots(cast.map((c) => c.choice as BallotChoice));
-		const myChoice = cast.find((c) => c.delegateId === delegate.id)?.choice ?? null;
+			.where(eq(ballots.voteId, v.id));
+		const latest = new Map<string, BallotChoice>();
+		for (const b of [...cast].sort((a, b) => a.round - b.round)) latest.set(b.delegateId, b.choice as BallotChoice);
+		const tally = tallyBallots([...latest.values()]);
+		const myChoice = latest.get(delegate.id) ?? null;
 
 		let label = v.label;
 		if (!label && v.subjectType === 'motion' && v.subjectId) {

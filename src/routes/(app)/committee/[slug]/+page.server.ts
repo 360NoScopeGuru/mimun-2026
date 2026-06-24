@@ -114,6 +114,13 @@ export const actions: Actions = {
 			return fail(403, { message: 'You must be present to vote' });
 		}
 
+		// In a roll-call second round, only delegations that passed may vote.
+		if (vote.round > 1) {
+			const prior = await db.select({ choice: ballots.choice, round: ballots.round }).from(ballots).where(and(eq(ballots.voteId, vote.id), eq(ballots.delegateId, delegate.id)));
+			const latestPrior = prior.sort((a, b) => b.round - a.round)[0];
+			if (!latestPrior || latestPrior.choice !== 'pass') return fail(403, { message: 'Only delegations that passed may vote this round' });
+		}
+
 		await db
 			.insert(ballots)
 			.values({ voteId: vote.id, delegateId: delegate.id, choice: choice as BallotChoice, round: vote.round })
@@ -283,6 +290,26 @@ export const actions: Actions = {
 
 		await audit(committee, chair.id, 'close_vote', { voteId: vote.id, subjectType: vote.subjectType, result, tally: t });
 		return { success: true, result };
+	},
+
+	// Roll call: open a second round so delegations that passed must now vote.
+	advanceRound: async ({ request, locals, params }) => {
+		const committee = await loadCommittee(params.slug);
+		const chair = assertChair(locals.delegate, committee.id);
+
+		const voteId = String((await request.formData()).get('voteId') ?? '');
+		const [vote] = await db.select().from(votes).where(and(eq(votes.id, voteId), eq(votes.committeeId, committee.id)));
+		if (!vote || vote.status !== 'open' || vote.method !== 'roll_call') return fail(400);
+
+		const passes = await db
+			.select({ id: ballots.id })
+			.from(ballots)
+			.where(and(eq(ballots.voteId, vote.id), eq(ballots.round, vote.round), eq(ballots.choice, 'pass')));
+		if (passes.length === 0) return fail(400, { message: 'No delegations passed' });
+
+		await db.update(votes).set({ round: vote.round + 1 }).where(eq(votes.id, vote.id));
+		await audit(committee, chair.id, 'open_second_round', { voteId: vote.id, round: vote.round + 1 });
+		return { success: true };
 	},
 
 	// A delegate raises a motion onto the precedence-ordered queue.
