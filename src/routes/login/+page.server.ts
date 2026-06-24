@@ -28,6 +28,9 @@ export const actions: Actions = {
 		const session = await createSession(token, delegate.id);
 		setSessionCookie(event, token, session.expiresAt);
 
+		// Secretariat / admin land in the admin console.
+		if (delegate.role === 'admin' || delegate.role === 'secretariat') throw redirect(302, '/admin');
+
 		if (delegate.committeeId) {
 			const [committee] = await db.select().from(committees).where(eq(committees.id, delegate.committeeId));
 			if (committee) throw redirect(302, `/committee/${committee.slug}`);
