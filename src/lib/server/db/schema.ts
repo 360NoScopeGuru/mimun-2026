@@ -217,6 +217,8 @@ export const votes = pgTable('votes', {
 		.references(() => committees.id),
 	subjectType: voteSubjectType('subject_type').notNull(),
 	subjectId: uuid('subject_id'), // polymorphic → motions/amendments/resolutions
+	// Human-readable question shown to delegates (e.g. "Motion for a 10-min moderated caucus").
+	label: text('label').notNull().default(''),
 	kind: voteKind('kind').notNull(),
 	majorityRule: majorityRule('majority_rule').notNull().default('simple'),
 	method: voteMethod('method').notNull().default('placard'),

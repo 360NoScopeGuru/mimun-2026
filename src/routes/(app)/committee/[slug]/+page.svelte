@@ -1,52 +1,51 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { onMount, tick } from 'svelte';
+	import type { SubmitFunction } from '@sveltejs/kit';
 	import type { PageData } from './$types';
+	import Timer from '$lib/components/Timer.svelte';
 
 	let { data }: { data: PageData } = $props();
+	const me = data.delegate!;
+	const isChair = me.role === 'chair' || me.role === 'deputy_chair' || me.role === 'admin' || me.role === 'secretariat';
 
-	// Local chat messages may include an optimistic entry awaiting server confirmation.
-	// createdAt is a Date from the initial load but a string from the JSON poll, so allow both.
-	type ChatMessage = Omit<PageData['messages'][number], 'createdAt'> & {
+	type ChatMessage = Omit<PageData['state']['messages'][number], 'createdAt'> & {
 		createdAt: string | Date;
 		pending?: boolean;
 	};
 
-	let messages = $state<ChatMessage[]>(data.messages);
-	let queue = $state(data.queue);
-	let speaking = $state(data.speaking);
-	let committeeStatus = $state(data.committee.status);
+	let messages = $state<ChatMessage[]>(data.state.messages);
+	let floor = $state(data.state.floor);
+	let queue = $state(data.state.queue);
+	let att = $state(data.state.attendance);
+	let vote = $state(data.state.vote);
+	let resolution = $state(data.state.resolution);
+	let cstatus = $state(data.state.status);
+
 	let messageInput = $state('');
 	let sending = $state(false);
 	let scrollEl: HTMLDivElement;
-
 	let lastEventAt = $state(
-		data.messages.length > 0
-			? new Date(data.messages[data.messages.length - 1].createdAt).toISOString()
+		data.state.messages.length > 0
+			? new Date(data.state.messages[data.state.messages.length - 1].createdAt).toISOString()
 			: new Date(0).toISOString()
 	);
 
-	const isChair = data.delegate?.role === 'chair' || data.delegate?.role === 'admin';
-	const inQueue = $derived(queue.some((q) => q.delegateId === data.delegate?.id));
+	const inQueue = $derived(queue.some((q) => q.delegateId === me.id));
+	const canVote = $derived(att.mine === 'present_and_voting');
 
-	const roleLabel: Record<string, string> = { chair: 'Chair', admin: 'Secretariat' };
+	const roleLabel: Record<string, string> = { chair: 'Chair', deputy_chair: 'Deputy Chair', admin: 'Secretariat', secretariat: 'Secretariat' };
+	const affiliation = (country: string, role?: string) => country || (role ? (roleLabel[role] ?? '') : '');
 
-	// What to show beside a name: a delegate's country, or a non-delegate's role.
-	function affiliation(country: string, role?: string): string {
-		return country || (role ? (roleLabel[role] ?? '') : '');
-	}
-
-	const statusLabel: Record<string, string> = {
-		pending: 'Not yet in session',
-		in_session: 'In session',
-		suspended: 'Suspended',
-		closed: 'Closed'
-	};
-	const statusDot: Record<string, string> = {
-		pending: 'bg-ink-400',
-		in_session: 'bg-signal-green pulse-dot',
-		suspended: 'bg-signal-amber',
-		closed: 'bg-signal-red'
+	const statusLabel: Record<string, string> = { pending: 'Not in session', in_session: 'In session', suspended: 'Suspended', closed: 'Closed' };
+	const statusDot: Record<string, string> = { pending: 'bg-ink-400', in_session: 'bg-signal-green pulse-dot', suspended: 'bg-signal-amber', closed: 'bg-signal-red' };
+	const modeLabel: Record<string, string> = {
+		closed: 'Floor closed',
+		roll_call: 'Roll call',
+		formal_debate: 'Formal debate',
+		moderated_caucus: 'Moderated caucus',
+		unmoderated_caucus: 'Unmoderated caucus',
+		voting: 'Voting procedure'
 	};
 
 	async function scrollToBottom() {
@@ -55,191 +54,309 @@
 	}
 
 	async function poll() {
-		const res = await fetch(`/committee/${data.committee.slug}/events?since=${encodeURIComponent(lastEventAt)}`);
+		const res = await fetch(`/committee/${data.committee.slug}/state?since=${encodeURIComponent(lastEventAt)}`);
 		if (!res.ok) return;
-		const update = await res.json();
-
-		if (update.messages.length > 0) {
-			const incoming: ChatMessage[] = update.messages;
-			// Drop optimistic entries the server has now confirmed (match author + body).
-			const confirmed = messages.filter(
-				(m) => !m.pending || !incoming.some((i) => i.author === m.author && i.body === m.body)
-			);
+		const u = await res.json();
+		if (u.messages.length > 0) {
+			const incoming: ChatMessage[] = u.messages;
+			const confirmed = messages.filter((m) => !m.pending || !incoming.some((i) => i.author === m.author && i.body === m.body));
 			messages = [...confirmed, ...incoming];
 			lastEventAt = new Date(incoming[incoming.length - 1].createdAt).toISOString();
 			scrollToBottom();
 		}
-		queue = update.queue;
-		speaking = update.speaking;
-		committeeStatus = update.status;
+		floor = u.floor;
+		queue = u.queue;
+		att = u.attendance;
+		vote = u.vote;
+		resolution = u.resolution;
+		cstatus = u.status;
 	}
+
+	// Re-poll immediately after a floor-changing action so the room feels live.
+	const refresh: SubmitFunction = () => async ({ update }) => {
+		await update({ reset: false });
+		await poll();
+	};
 
 	onMount(() => {
 		scrollToBottom();
-		const interval = setInterval(() => poll().catch(() => {}), 1000);
-		return () => clearInterval(interval);
+		const i = setInterval(() => poll().catch(() => {}), 1000);
+		return () => clearInterval(i);
 	});
+
+	const tallyBase = $derived(vote ? vote.tally.for + vote.tally.against : 0);
 </script>
 
-<svelte:head>
-	<title>{data.committee.name} — MIMUN 2026</title>
-</svelte:head>
+<svelte:head><title>{data.committee.name} — MIMUN 2026</title></svelte:head>
 
-<div class="grid h-[calc(100vh-57px)] grid-cols-1 lg:grid-cols-[1fr_380px]">
-	<!-- Chamber floor: debate + chat -->
-	<section class="flex min-w-0 flex-col border-r border-white/[0.07]">
-		<div class="flex items-center justify-between gap-4 border-b border-white/[0.07] px-6 py-4">
-			<div class="min-w-0">
-				<p class="label label-brass mb-1">In committee</p>
-				<h1 class="display truncate text-xl text-ink-50">{data.committee.name}</h1>
-				{#if data.committee.topic}<p class="mt-1 truncate text-sm text-ink-400">{data.committee.topic}</p>{/if}
+<div class="flex h-[calc(100vh-57px)] flex-col">
+	<!-- Floor bar -->
+	<div class="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-white/[0.07] px-6 py-3">
+		<div class="min-w-0">
+			<div class="flex items-center gap-2">
+				<p class="label label-brass">{modeLabel[floor.mode] ?? floor.mode}</p>
+				<span class="h-1 w-1 rounded-full bg-ink-600"></span>
+				<span class="flex items-center gap-1.5 text-xs text-ink-300">
+					<span class="h-1.5 w-1.5 rounded-full {statusDot[cstatus]}"></span>{statusLabel[cstatus]}
+				</span>
 			</div>
-			<div class="flex shrink-0 items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-ink-200">
-				<span class="h-1.5 w-1.5 rounded-full {statusDot[committeeStatus]}"></span>
-				{statusLabel[committeeStatus]}
-			</div>
+			<h1 class="display mt-0.5 truncate text-lg text-ink-50">{data.committee.name}</h1>
 		</div>
-
-		<div bind:this={scrollEl} class="flex-1 space-y-5 overflow-y-auto px-6 py-6">
-			{#each messages as message (message.id)}
-				<div class="flex gap-3" class:opacity-50={message.pending}>
-					<div class="emblem mt-0.5 h-8 w-8 shrink-0 rounded-full text-xs">
-						{message.author.slice(0, 1)}
-					</div>
-					<div class="min-w-0">
-						<div class="flex items-baseline gap-2">
-							<span class="text-sm font-semibold text-ink-100">{message.author}</span>
-							{#if affiliation(message.country, message.role)}
-								<span class="label text-[0.625rem] text-ink-500">{affiliation(message.country, message.role)}</span>
-							{/if}
-						</div>
-						<p class="mt-1 text-[0.9375rem] leading-relaxed text-ink-200">{message.body}</p>
-					</div>
+		<div class="flex items-center gap-4">
+			{#if floor.mode === 'moderated_caucus' || floor.mode === 'unmoderated_caucus'}
+				<div class="rounded-lg border border-brass-600/30 bg-brass-500/[0.08] px-3 py-1.5">
+					<Timer endsAt={floor.caucusTimerEndsAt} label="Caucus" />
+					{#if floor.caucusTopic}<p class="mt-0.5 max-w-[14rem] truncate text-[0.7rem] text-ink-400">{floor.caucusTopic}</p>{/if}
 				</div>
-			{:else}
-				<div class="mt-16 text-center">
-					<div class="emblem mx-auto mb-4 h-12 w-12 rounded-full text-lg opacity-70">M</div>
-					<p class="text-sm text-ink-500">The floor is quiet — address your committee to begin.</p>
-				</div>
-			{/each}
-		</div>
-
-		<form
-			method="POST"
-			action="?/sendMessage"
-			class="border-t border-white/[0.07] px-6 py-4"
-			use:enhance={() => {
-				const me = data.delegate!;
-				const body = messageInput.trim();
-				const tempId = `temp-${crypto.randomUUID()}`;
-				sending = true;
-
-				// Optimistically show our own message immediately; the next poll
-				// reconciles it with the server-confirmed copy (matched by author + body).
-				messages = [
-					...messages,
-					{ id: tempId, body, createdAt: new Date().toISOString(), author: me.fullName, country: me.country, role: me.role, pending: true }
-				];
-				messageInput = '';
-				scrollToBottom();
-
-				return async ({ result, update }) => {
-					if (result.type === 'failure' || result.type === 'error') {
-						messages = messages.filter((m) => m.id !== tempId);
-						messageInput = body; // restore so the delegate can retry
-					}
-					await update({ reset: false });
-					sending = false;
-				};
-			}}
-		>
-			<div class="flex items-center gap-3">
-				<input
-					name="body"
-					bind:value={messageInput}
-					placeholder="Address your committee…"
-					autocomplete="off"
-					class="input flex-1"
-				/>
-				<button type="submit" disabled={sending || !messageInput.trim()} class="btn btn-brass focus-ring">
-					Send
-				</button>
-			</div>
-		</form>
-	</section>
-
-	<!-- The dais: speaker's list + chair controls -->
-	<aside class="flex flex-col bg-ink-950/30">
-		<div class="border-b border-white/[0.07] px-5 py-4">
-			<p class="label label-brass">Speaking now</p>
-			{#if speaking}
-				<div class="mt-3 flex items-center gap-3 rounded-xl border border-brass-600/30 bg-brass-500/[0.08] px-4 py-3">
-					<span class="h-2 w-2 shrink-0 rounded-full bg-signal-green pulse-dot"></span>
-					<div class="min-w-0">
-						<p class="truncate text-sm font-semibold text-ink-50">{speaking.name}</p>
-						{#if speaking.country}<p class="label text-[0.625rem] text-ink-400">{speaking.country}</p>{/if}
-					</div>
-				</div>
-			{:else}
-				<p class="mt-3 text-sm text-ink-500">No one holds the floor.</p>
 			{/if}
-		</div>
-
-		<div class="flex-1 overflow-y-auto px-5 py-4">
-			<div class="mb-3 flex items-center justify-between">
-				<p class="label">Speaker's list</p>
-				<span class="font-mono text-xs text-ink-500">{queue.length} waiting</span>
+			<div class="text-right">
+				<p class="label text-[0.6rem]">Quorum</p>
+				<p class="font-mono text-sm tabular-nums {att.hasQuorum ? 'text-signal-green' : 'text-ink-300'}">
+					{att.present}/{att.total}
+					<span class="text-[0.65rem] text-ink-500">{att.hasQuorum ? 'met' : `need ${att.quorumThreshold}`}</span>
+				</p>
 			</div>
+		</div>
+	</div>
 
-			<ol class="space-y-1.5">
-				{#each queue as entry, i (entry.id)}
-					<li class="flex items-center gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
-						<span class="font-mono text-xs font-medium text-brass-400 tabular-nums">{(i + 1).toString().padStart(2, '0')}</span>
-						<div class="min-w-0 flex-1">
-							<p class="truncate text-sm text-ink-100">{entry.name}</p>
-							{#if entry.country}<p class="truncate text-xs text-ink-500">{entry.country}</p>{/if}
+	<div class="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[1fr_400px]">
+		<!-- Chamber floor: chat -->
+		<section class="flex min-w-0 flex-col border-r border-white/[0.07]">
+			<div bind:this={scrollEl} class="flex-1 space-y-5 overflow-y-auto px-6 py-6">
+				{#each messages as message (message.id)}
+					<div class="flex gap-3" class:opacity-50={message.pending}>
+						<div class="emblem mt-0.5 h-8 w-8 shrink-0 rounded-full text-xs">{message.author.slice(0, 1)}</div>
+						<div class="min-w-0">
+							<div class="flex items-baseline gap-2">
+								<span class="text-sm font-semibold text-ink-100">{message.author}</span>
+								{#if affiliation(message.country, message.role)}<span class="label text-[0.625rem] text-ink-500">{affiliation(message.country, message.role)}</span>{/if}
+							</div>
+							<p class="mt-1 text-[0.9375rem] leading-relaxed text-ink-200">{message.body}</p>
 						</div>
-					</li>
+					</div>
 				{:else}
-					<p class="rounded-lg border border-dashed border-white/[0.07] px-3 py-4 text-center text-sm text-ink-500">
-						The list is open.
-					</p>
+					<div class="mt-16 text-center">
+						<div class="emblem mx-auto mb-4 h-12 w-12 rounded-full text-lg opacity-70">M</div>
+						<p class="text-sm text-ink-500">The floor is quiet — address your committee to begin.</p>
+					</div>
 				{/each}
-			</ol>
-
-			{#if !isChair}
-				<form method="POST" action={inQueue ? '?/leaveQueue' : '?/joinQueue'} use:enhance class="mt-4">
-					<button type="submit" class="btn focus-ring w-full {inQueue ? 'btn-ghost' : 'btn-brass'}">
-						{inQueue ? 'Withdraw from the list' : 'Request to speak'}
-					</button>
-				</form>
-			{/if}
-		</div>
-
-		{#if isChair}
-			<div class="border-t border-white/[0.07] px-5 py-4">
-				<p class="label label-brass mb-3">Chair controls</p>
-				<form method="POST" action="?/callNext" use:enhance>
-					<button type="submit" disabled={queue.length === 0} class="btn btn-brass focus-ring w-full">
-						Recognize next speaker
-					</button>
-				</form>
-
-				<p class="label mt-4 mb-2 text-[0.625rem]">Session</p>
-				<div class="grid grid-cols-3 gap-2">
-					{#each [['in_session', 'Open'], ['suspended', 'Suspend'], ['closed', 'Close']] as [value, text] (value)}
-						<form method="POST" action="?/setStatus" use:enhance>
-							<input type="hidden" name="status" {value} />
-							<button
-								type="submit"
-								class="btn focus-ring w-full py-2 text-xs {committeeStatus === value ? 'btn-ghost border-brass-600/50 text-brass-300' : 'btn-quiet'}"
-							>
-								{text}
-							</button>
-						</form>
-					{/each}
-				</div>
 			</div>
-		{/if}
-	</aside>
+
+			<form
+				method="POST"
+				action="?/sendMessage"
+				class="border-t border-white/[0.07] px-6 py-4"
+				use:enhance={() => {
+					const body = messageInput.trim();
+					const tempId = `temp-${crypto.randomUUID()}`;
+					sending = true;
+					messages = [...messages, { id: tempId, body, createdAt: new Date().toISOString(), author: me.fullName, country: me.country, role: me.role, pending: true }];
+					messageInput = '';
+					scrollToBottom();
+					return async ({ result, update }) => {
+						if (result.type === 'failure' || result.type === 'error') {
+							messages = messages.filter((m) => m.id !== tempId);
+							messageInput = body;
+						}
+						await update({ reset: false });
+						sending = false;
+					};
+				}}
+			>
+				<div class="flex items-center gap-3">
+					<input name="body" bind:value={messageInput} placeholder="Address your committee…" autocomplete="off" class="input flex-1" />
+					<button type="submit" disabled={sending || !messageInput.trim()} class="btn btn-brass focus-ring">Send</button>
+				</div>
+			</form>
+		</section>
+
+		<!-- The dais -->
+		<aside class="flex flex-col overflow-y-auto bg-ink-950/30">
+			<!-- Roll call (delegate sets own presence) -->
+			{#if floor.mode === 'roll_call'}
+				<div class="border-b border-white/[0.07] px-5 py-4">
+					<p class="label label-brass mb-3">Roll call</p>
+					{#if isChair}
+						<p class="text-sm text-ink-300">{att.present} present · {att.voting} voting · {att.total} members</p>
+					{:else}
+						<p class="mb-3 text-sm text-ink-400">Declare your delegation present.</p>
+						<div class="grid grid-cols-2 gap-2">
+							{#each [['present', 'Present'], ['present_and_voting', 'Present & voting']] as [value, text] (value)}
+								<form method="POST" action="?/setAttendance" use:enhance={refresh}>
+									<input type="hidden" name="status" {value} />
+									<button class="btn focus-ring w-full py-2 text-xs {att.mine === value ? 'btn-brass' : 'btn-ghost'}">{text}</button>
+								</form>
+							{/each}
+						</div>
+					{/if}
+				</div>
+			{/if}
+
+			<!-- Open vote -->
+			{#if vote}
+				<div class="border-b border-white/[0.07] px-5 py-4">
+					<p class="label label-brass mb-1">Vote in progress</p>
+					<p class="mb-3 text-sm text-ink-100">{vote.label}</p>
+
+					<div class="space-y-1.5">
+						{#each [['for', 'For', 'bg-vote-for'], ['against', 'Against', 'bg-vote-against'], ['abstain', 'Abstain', 'bg-vote-abstain']] as [key, text, color] (key)}
+							<div class="flex items-center gap-2">
+								<span class="w-16 text-xs text-ink-300">{text}</span>
+								<div class="h-2 flex-1 overflow-hidden rounded-full bg-white/[0.06]">
+									<div class="{color} h-full rounded-full" style="width: {tallyBase + vote.tally.abstain > 0 ? (vote.tally[key as 'for'] / (tallyBase + vote.tally.abstain)) * 100 : 0}%"></div>
+								</div>
+								<span class="w-6 text-right font-mono text-xs tabular-nums text-ink-200">{vote.tally[key as 'for']}</span>
+							</div>
+						{/each}
+					</div>
+
+					{#if !isChair}
+						{#if canVote}
+							<div class="mt-3 grid grid-cols-3 gap-2">
+								{#each [['for', 'For'], ['against', 'Against'], ['abstain', 'Abstain']] as [choice, text] (choice)}
+									<form method="POST" action="?/castBallot" use:enhance={refresh}>
+										<input type="hidden" name="voteId" value={vote.id} />
+										<input type="hidden" name="choice" value={choice} />
+										<button class="btn focus-ring w-full py-2 text-xs {vote.myChoice === choice ? 'btn-brass' : 'btn-ghost'}">{text}</button>
+									</form>
+								{/each}
+							</div>
+						{:else}
+							<p class="mt-3 text-xs text-ink-500">Only present-and-voting delegations may vote.</p>
+						{/if}
+					{:else}
+						<form method="POST" action="?/closeVote" use:enhance={refresh} class="mt-3">
+							<input type="hidden" name="voteId" value={vote.id} />
+							<button class="btn btn-brass focus-ring w-full py-2 text-xs">Close vote &amp; announce</button>
+						</form>
+					{/if}
+				</div>
+			{/if}
+
+			<!-- Speaking now + speaker's list -->
+			<div class="border-b border-white/[0.07] px-5 py-4">
+				<p class="label label-brass">Speaking now</p>
+				{#if floor.currentSpeaker}
+					<div class="mt-3 flex items-center justify-between gap-3 rounded-xl border border-brass-600/30 bg-brass-500/[0.08] px-4 py-3">
+						<div class="min-w-0">
+							<p class="truncate text-sm font-semibold text-ink-50">{floor.currentSpeaker.name}</p>
+							{#if floor.currentSpeaker.country}<p class="label text-[0.625rem] text-ink-400">{floor.currentSpeaker.country}</p>{/if}
+						</div>
+						<Timer endsAt={floor.speakerTimerEndsAt} />
+					</div>
+				{:else}
+					<p class="mt-3 text-sm text-ink-500">No one holds the floor.</p>
+				{/if}
+			</div>
+
+			<div class="border-b border-white/[0.07] px-5 py-4">
+				<div class="mb-3 flex items-center justify-between">
+					<p class="label">Speaker's list</p>
+					<span class="font-mono text-xs text-ink-500">{queue.length} waiting</span>
+				</div>
+				<ol class="space-y-1.5">
+					{#each queue as entry, i (entry.id)}
+						<li class="flex items-center gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
+							<span class="font-mono text-xs font-medium text-brass-400 tabular-nums">{(i + 1).toString().padStart(2, '0')}</span>
+							<div class="min-w-0 flex-1">
+								<p class="truncate text-sm text-ink-100">{entry.name}</p>
+								{#if entry.country}<p class="truncate text-xs text-ink-500">{entry.country}</p>{/if}
+							</div>
+						</li>
+					{:else}
+						<p class="rounded-lg border border-dashed border-white/[0.07] px-3 py-4 text-center text-sm text-ink-500">The list is open.</p>
+					{/each}
+				</ol>
+				{#if !isChair}
+					<form method="POST" action={inQueue ? '?/leaveQueue' : '?/joinQueue'} use:enhance={refresh} class="mt-3">
+						<button class="btn focus-ring w-full {inQueue ? 'btn-ghost' : 'btn-brass'}">{inQueue ? 'Withdraw from the list' : 'Request to speak'}</button>
+					</form>
+				{/if}
+			</div>
+
+			<!-- Resolution on the table -->
+			{#if resolution}
+				<a href="/committee/{data.committee.slug}/resolutions" class="block border-b border-white/[0.07] px-5 py-4 transition-colors hover:bg-white/[0.02]">
+					<p class="label label-brass mb-2">Resolution</p>
+					<div class="flex items-center gap-2">
+						{#if resolution.designation}<span class="rounded border border-brass-600/40 px-1.5 py-0.5 font-mono text-[0.65rem] text-brass-300">{resolution.designation}</span>{/if}
+						<span class="text-[0.625rem] text-ink-500 uppercase">{resolution.status}</span>
+					</div>
+					<p class="mt-1.5 text-sm leading-snug text-ink-200">{resolution.title}</p>
+					<p class="mt-1 text-xs text-brass-400">Open in the drafting room →</p>
+				</a>
+			{/if}
+
+			<!-- Chair console -->
+			{#if isChair}
+				<div class="px-5 py-4">
+					<p class="label label-brass mb-3">Chair controls</p>
+
+					<div class="space-y-3">
+						<!-- Roll call -->
+						{#if floor.mode === 'roll_call'}
+							<form method="POST" action="?/closeRollCall" use:enhance={refresh}>
+								<button class="btn btn-ghost focus-ring w-full py-2 text-xs">Close roll call</button>
+							</form>
+						{:else}
+							<form method="POST" action="?/openRollCall" use:enhance={refresh}>
+								<button class="btn btn-ghost focus-ring w-full py-2 text-xs">Take roll call</button>
+							</form>
+						{/if}
+
+						<!-- Speaker -->
+						<form method="POST" action="?/callNext" use:enhance={refresh}>
+							<button disabled={queue.length === 0} class="btn btn-brass focus-ring w-full py-2 text-xs">Recognize next speaker</button>
+						</form>
+
+						<!-- Caucus -->
+						{#if floor.mode === 'moderated_caucus' || floor.mode === 'unmoderated_caucus'}
+							<form method="POST" action="?/endCaucus" use:enhance={refresh}>
+								<button class="btn btn-ghost focus-ring w-full py-2 text-xs">End caucus</button>
+							</form>
+						{:else}
+							<form method="POST" action="?/startCaucus" use:enhance={refresh} class="rounded-lg border border-white/[0.07] p-3">
+								<p class="label mb-2 text-[0.6rem]">Start caucus</p>
+								<div class="flex gap-2">
+									<select name="type" class="input flex-1 py-1.5 text-xs">
+										<option value="moderated_caucus">Moderated</option>
+										<option value="unmoderated_caucus">Unmoderated</option>
+									</select>
+									<input name="totalSeconds" type="number" min="30" max="3600" value="600" class="input w-20 py-1.5 text-xs" title="Total seconds" />
+								</div>
+								<input name="topic" placeholder="Topic (optional)" class="input mt-2 py-1.5 text-xs" />
+								<button class="btn btn-brass focus-ring mt-2 w-full py-2 text-xs">Start</button>
+							</form>
+						{/if}
+
+						<!-- Vote -->
+						{#if !vote}
+							<form method="POST" action="?/openVote" use:enhance={refresh} class="rounded-lg border border-white/[0.07] p-3">
+								<p class="label mb-2 text-[0.6rem]">Open a vote</p>
+								<input name="label" placeholder="Question put to the floor…" class="input py-1.5 text-xs" />
+								<select name="majorityRule" class="input mt-2 py-1.5 text-xs">
+									<option value="simple">Simple majority</option>
+									<option value="two_thirds">Two-thirds majority</option>
+								</select>
+								<button class="btn btn-brass focus-ring mt-2 w-full py-2 text-xs">Open vote</button>
+							</form>
+						{/if}
+
+						<!-- Session status -->
+						<div>
+							<p class="label mt-1 mb-2 text-[0.6rem]">Session</p>
+							<div class="grid grid-cols-3 gap-2">
+								{#each [['in_session', 'Open'], ['suspended', 'Suspend'], ['closed', 'Close']] as [value, text] (value)}
+									<form method="POST" action="?/setStatus" use:enhance={refresh}>
+										<input type="hidden" name="status" {value} />
+										<button class="btn focus-ring w-full py-2 text-xs {cstatus === value ? 'btn-ghost border-brass-600/50 text-brass-300' : 'btn-quiet'}">{text}</button>
+									</form>
+								{/each}
+							</div>
+						</div>
+					</div>
+				</div>
+			{/if}
+		</aside>
+	</div>
 </div>
