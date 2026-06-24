@@ -105,8 +105,8 @@
 	}
 
 	// Re-poll immediately after a floor-changing action so the room feels live.
-	const refresh: SubmitFunction = () => async ({ update }) => {
-		await update({ reset: false });
+	// (No invalidateAll/update() — the room is driven entirely by poll().)
+	const refresh: SubmitFunction = () => async () => {
 		await poll();
 	};
 
@@ -181,18 +181,22 @@
 				class="border-t border-white/[0.07] px-6 py-4"
 				use:enhance={() => {
 					const body = messageInput.trim();
-					const tempId = `temp-${crypto.randomUUID()}`;
-					sending = true;
+					const tempId = `temp-${crypto.randomUUID?.() ?? Date.now() + Math.random()}`;
+					// Optimistically show our own message immediately.
 					messages = [...messages, { id: tempId, body, createdAt: new Date().toISOString(), author: me.fullName, country: me.country, role: me.role, pending: true }];
 					messageInput = '';
+					sending = true;
 					scrollToBottom();
-					return async ({ result, update }) => {
+					return async ({ result }) => {
+						// Always re-enable the input first, no matter what happens next.
+						sending = false;
 						if (result.type === 'failure' || result.type === 'error') {
 							messages = messages.filter((m) => m.id !== tempId);
 							messageInput = body;
+						} else {
+							// Reconcile the optimistic message with the server copy.
+							poll().catch(() => {});
 						}
-						await update({ reset: false });
-						sending = false;
 					};
 				}}
 			>
