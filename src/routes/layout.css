@@ -1,7 +1,9 @@
 /* Self-hosted variable fonts (must precede other rules) */
-@import '@fontsource-variable/fraunces';
+@import '@fontsource-variable/bodoni-moda';
+@import '@fontsource-variable/syne';
 @import '@fontsource-variable/inter';
 @import '@fontsource-variable/jetbrains-mono';
+@import '@fontsource/mr-dafoe';
 
 @import 'tailwindcss';
 @plugin '@tailwindcss/typography';
@@ -17,10 +19,17 @@
 */
 
 @theme {
-	/* Type */
+	/* Type
+	   display   — Bodoni Moda: dramatic high-contrast didone for hero moments
+	   accent    — Syne: eccentric contemporary display for small-caps labels
+	   sans      — Inter: all UI + body
+	   mono      — JetBrains Mono: timers, tallies, codes, designations
+	   signature — Mr Dafoe: the "signed into adoption" flourish */
 	--font-sans: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-	--font-display: 'Fraunces Variable', 'Iowan Old Style', Georgia, 'Times New Roman', serif;
+	--font-display: 'Bodoni Moda Variable', 'Iowan Old Style', Georgia, 'Times New Roman', serif;
+	--font-accent: 'Syne Variable', 'Inter Variable', system-ui, sans-serif;
 	--font-mono: 'JetBrains Mono Variable', ui-monospace, 'SF Mono', Menlo, monospace;
+	--font-signature: 'Mr Dafoe', 'Snell Roundhand', cursive;
 
 	/* Chamber — navy ink ramp (950 = deepest, 50 = lightest) */
 	--color-ink-950: #060912;
@@ -114,11 +123,12 @@ body {
    Editorial primitives
 ----------------------------------------------------------------*/
 
-/* Small-caps eyebrow label */
+/* Small-caps eyebrow label — Syne gives the chrome its abstract character */
 .label {
+	font-family: var(--font-accent);
 	font-size: 0.6875rem;
-	font-weight: 600;
-	letter-spacing: 0.14em;
+	font-weight: 700;
+	letter-spacing: 0.16em;
 	text-transform: uppercase;
 	color: var(--color-ink-300);
 }
@@ -137,13 +147,21 @@ body {
 	opacity: 0.5;
 }
 
-/* Display heading helper */
+/* Display heading helper — Bodoni Moda, dramatic at scale */
 .display {
 	font-family: var(--font-display);
 	font-optical-sizing: auto;
 	font-weight: 500;
-	letter-spacing: -0.02em;
-	line-height: 1.05;
+	letter-spacing: -0.01em;
+	line-height: 1.06;
+}
+
+/* Signature flourish — the "signed into adoption" mark */
+.signature {
+	font-family: var(--font-signature);
+	font-weight: 400;
+	letter-spacing: 0.01em;
+	line-height: 1;
 }
 
 /* ---------------------------------------------------------------

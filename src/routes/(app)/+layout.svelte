@@ -13,7 +13,7 @@
 		<a href="/" class="flex items-center gap-3">
 			<span class="emblem h-8 w-8 rounded-lg text-sm">M</span>
 			<span class="flex flex-col leading-none">
-				<span class="display text-[0.95rem] text-ink-50">MIMUN 2026</span>
+				<span class="display text-[1.05rem] font-semibold text-ink-50">MIMUN 2026</span>
 				<span class="label mt-1 text-[0.6rem] text-ink-500">Council Platform</span>
 			</span>
 		</a>

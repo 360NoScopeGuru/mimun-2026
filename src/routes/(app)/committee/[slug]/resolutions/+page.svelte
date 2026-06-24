@@ -113,6 +113,13 @@
 						</div>
 					</div>
 
+					{#if sel.status === 'adopted'}
+						<div class="mt-5 flex items-end justify-between border-t border-paper-line pt-4">
+							<span class="signature text-4xl leading-none text-paper-brass">Adopted by the committee</span>
+							{#if sel.designation}<span class="font-mono text-xs text-paper-ink-500">Res. {sel.designation}</span>{/if}
+						</div>
+					{/if}
+
 					<hr class="my-6 border-paper-line" />
 
 					<!-- Preambulatory clauses -->
