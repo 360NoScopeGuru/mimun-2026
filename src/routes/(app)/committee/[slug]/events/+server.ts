@@ -17,7 +17,7 @@ export const GET: RequestHandler = async ({ params, locals, url }) => {
 
 	const [newMessages, queueRows, speakingRows] = await Promise.all([
 		db
-			.select({ id: messages.id, body: messages.body, createdAt: messages.createdAt, author: delegates.fullName, country: delegates.country })
+			.select({ id: messages.id, body: messages.body, createdAt: messages.createdAt, author: delegates.fullName, country: delegates.country, role: delegates.role })
 			.from(messages)
 			.innerJoin(delegates, eq(messages.delegateId, delegates.id))
 			.where(and(eq(messages.committeeId, committee.id), gt(messages.createdAt, sinceDate)))

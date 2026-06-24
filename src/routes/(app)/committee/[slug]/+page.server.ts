@@ -21,7 +21,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 
 	const [messageRows, queueRows] = await Promise.all([
 		db
-			.select({ id: messages.id, body: messages.body, createdAt: messages.createdAt, author: delegates.fullName, country: delegates.country })
+			.select({ id: messages.id, body: messages.body, createdAt: messages.createdAt, author: delegates.fullName, country: delegates.country, role: delegates.role })
 			.from(messages)
 			.innerJoin(delegates, eq(messages.delegateId, delegates.id))
 			.where(eq(messages.committeeId, committee.id))

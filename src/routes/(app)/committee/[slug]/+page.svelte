@@ -5,7 +5,14 @@
 
 	let { data }: { data: PageData } = $props();
 
-	let messages = $state(data.messages);
+	// Local chat messages may include an optimistic entry awaiting server confirmation.
+	// createdAt is a Date from the initial load but a string from the JSON poll, so allow both.
+	type ChatMessage = Omit<PageData['messages'][number], 'createdAt'> & {
+		createdAt: string | Date;
+		pending?: boolean;
+	};
+
+	let messages = $state<ChatMessage[]>(data.messages);
 	let queue = $state(data.queue);
 	let speaking = $state(data.speaking);
 	let committeeStatus = $state(data.committee.status);
@@ -21,6 +28,13 @@
 
 	const isChair = data.delegate?.role === 'chair' || data.delegate?.role === 'admin';
 	const inQueue = $derived(queue.some((q) => q.delegateId === data.delegate?.id));
+
+	const roleLabel: Record<string, string> = { chair: 'Chair', admin: 'Secretariat' };
+
+	// What to show beside a name: a delegate's country, or a non-delegate's role.
+	function affiliation(country: string, role?: string): string {
+		return country || (role ? (roleLabel[role] ?? '') : '');
+	}
 
 	const statusLabel: Record<string, string> = {
 		pending: 'Not yet in session',
@@ -46,8 +60,13 @@
 		const update = await res.json();
 
 		if (update.messages.length > 0) {
-			messages = [...messages, ...update.messages];
-			lastEventAt = update.messages[update.messages.length - 1].createdAt;
+			const incoming: ChatMessage[] = update.messages;
+			// Drop optimistic entries the server has now confirmed (match author + body).
+			const confirmed = messages.filter(
+				(m) => !m.pending || !incoming.some((i) => i.author === m.author && i.body === m.body)
+			);
+			messages = [...confirmed, ...incoming];
+			lastEventAt = new Date(incoming[incoming.length - 1].createdAt).toISOString();
 			scrollToBottom();
 		}
 		queue = update.queue;
@@ -57,7 +76,7 @@
 
 	onMount(() => {
 		scrollToBottom();
-		const interval = setInterval(() => poll().catch(() => {}), 2000);
+		const interval = setInterval(() => poll().catch(() => {}), 1000);
 		return () => clearInterval(interval);
 	});
 </script>
@@ -82,14 +101,14 @@
 
 		<div bind:this={scrollEl} class="flex-1 space-y-4 overflow-y-auto px-6 py-5">
 			{#each messages as message (message.id)}
-				<div class="flex gap-3">
+				<div class="flex gap-3" class:opacity-60={message.pending}>
 					<div class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-[10px] font-semibold text-[var(--color-ink-200)]">
 						{message.author.slice(0, 1)}
 					</div>
 					<div>
 						<div class="flex items-baseline gap-2">
 							<span class="text-sm font-medium text-[var(--color-ink-100)]">{message.author}</span>
-							{#if message.country}<span class="text-xs text-[var(--color-ink-500)]">{message.country}</span>{/if}
+							{#if affiliation(message.country, message.role)}<span class="text-xs text-[var(--color-ink-500)]">{affiliation(message.country, message.role)}</span>{/if}
 						</div>
 						<p class="mt-0.5 text-sm leading-relaxed text-[var(--color-ink-200)]">{message.body}</p>
 					</div>
@@ -104,9 +123,25 @@
 			action="?/sendMessage"
 			class="border-t border-white/[0.06] px-6 py-4"
 			use:enhance={() => {
+				const me = data.delegate!;
+				const body = messageInput.trim();
+				const tempId = `temp-${crypto.randomUUID()}`;
 				sending = true;
-				return async ({ update }) => {
-					messageInput = '';
+
+				// Optimistically show our own message immediately; the next poll
+				// reconciles it with the server-confirmed copy (matched by author + body).
+				messages = [
+					...messages,
+					{ id: tempId, body, createdAt: new Date().toISOString(), author: me.fullName, country: me.country, role: me.role, pending: true }
+				];
+				messageInput = '';
+				scrollToBottom();
+
+				return async ({ result, update }) => {
+					if (result.type === 'failure' || result.type === 'error') {
+						messages = messages.filter((m) => m.id !== tempId);
+						messageInput = body; // restore so the delegate can retry
+					}
 					await update({ reset: false });
 					sending = false;
 				};
