@@ -1,6 +1,6 @@
 import { and, eq } from 'drizzle-orm';
 import { db } from './db';
-import { committeeFloor, committees, resolutions, votes, type committees as committeesTable } from './db/schema';
+import { committeeFloor, committees, resolutions, resolutionClauses, amendments, votes, type committees as committeesTable } from './db/schema';
 import { presetFor, motionDef, substantiveMajority } from './procedure';
 
 type Committee = typeof committeesTable.$inferSelect;
@@ -38,6 +38,23 @@ export async function openSubstantiveVote(
 		.returning();
 	await db.update(committeeFloor).set({ mode: 'voting', updatedAt: new Date() }).where(eq(committeeFloor.committeeId, committee.id));
 	return v;
+}
+
+type Amendment = typeof amendments.$inferSelect;
+
+/** Apply an amendment to its resolution's clauses (strike / amend / add). */
+export async function applyAmendment(a: Amendment) {
+	if (a.action === 'strike' && a.targetClauseId) {
+		await db.delete(resolutionClauses).where(eq(resolutionClauses.id, a.targetClauseId));
+	} else if (a.action === 'amend' && a.targetClauseId) {
+		await db.update(resolutionClauses).set({ text: a.text }).where(eq(resolutionClauses.id, a.targetClauseId));
+	} else if (a.action === 'add') {
+		const existing = await db
+			.select({ position: resolutionClauses.position })
+			.from(resolutionClauses)
+			.where(and(eq(resolutionClauses.resolutionId, a.resolutionId), eq(resolutionClauses.kind, 'operative')));
+		await db.insert(resolutionClauses).values({ resolutionId: a.resolutionId, kind: 'operative', position: existing.length, text: a.text });
+	}
 }
 
 /** Carry out a motion that has passed (or been adopted by consent). */

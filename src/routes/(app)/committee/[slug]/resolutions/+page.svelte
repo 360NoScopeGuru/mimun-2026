@@ -6,6 +6,25 @@
 	const sel = $derived(data.selected);
 
 	const roleLabel: Record<string, string> = { main_submitter: 'Main submitter', co_submitter: 'Co-submitter', signatory: 'Signatory' };
+
+	const statusText: Record<string, string> = {
+		lobbying: 'Lobbying',
+		submitted: 'Awaiting approval',
+		approved: 'Approved',
+		on_floor: 'On the floor',
+		adopted: 'Adopted',
+		failed: 'Failed',
+		withdrawn: 'Withdrawn'
+	};
+	const statusColor: Record<string, string> = {
+		lobbying: 'bg-paper-200 text-paper-ink-700',
+		submitted: 'bg-paper-200 text-paper-ink-700',
+		approved: 'bg-paper-brass/15 text-paper-brass',
+		on_floor: 'bg-paper-brass/15 text-paper-brass',
+		adopted: 'bg-green-700/15 text-green-800',
+		failed: 'bg-red-700/15 text-red-800',
+		withdrawn: 'bg-paper-200 text-paper-ink-500'
+	};
 </script>
 
 <svelte:head><title>Resolutions — {data.committee.name}</title></svelte:head>
@@ -67,6 +86,33 @@
 						{/if}
 					</div>
 
+					<!-- lifecycle / approval panel -->
+					<div class="mt-4 flex flex-wrap items-center gap-2 rounded-lg border border-paper-line bg-paper-100/60 px-3 py-2">
+						<span class="label text-paper-ink-500">Status</span>
+						<span class="rounded px-2 py-0.5 text-xs font-medium {statusColor[sel.status]}">{statusText[sel.status] ?? sel.status}</span>
+						<div class="ml-auto flex flex-wrap gap-2">
+							{#if sel.status === 'lobbying' && (sel.isMainSubmitter || sel.canApprove)}
+								<form method="POST" action="?/submitResolution" use:enhance>
+									<input type="hidden" name="resolutionId" value={sel.id} />
+									<button class="btn btn-brass focus-ring px-3 py-1.5 text-xs">Submit for approval</button>
+								</form>
+							{:else if sel.status === 'submitted' && sel.canApprove}
+								<form method="POST" action="?/approveResolution" use:enhance>
+									<input type="hidden" name="resolutionId" value={sel.id} />
+									<button class="btn btn-brass focus-ring px-3 py-1.5 text-xs">Approve &amp; assign designation</button>
+								</form>
+								<form method="POST" action="?/returnResolution" use:enhance>
+									<input type="hidden" name="resolutionId" value={sel.id} />
+									<button class="focus-ring rounded-lg border border-paper-line px-3 py-1.5 text-xs text-paper-ink-700 transition-colors hover:bg-paper-100">Return</button>
+								</form>
+							{:else if sel.status === 'submitted'}
+								<span class="text-xs text-paper-ink-500">Awaiting the dais.</span>
+							{:else if sel.status === 'approved'}
+								<span class="text-xs text-paper-ink-500">Ready — introduce it from the committee room.</span>
+							{/if}
+						</div>
+					</div>
+
 					<hr class="my-6 border-paper-line" />
 
 					<!-- Preambulatory clauses -->
@@ -89,6 +135,67 @@
 					{#if sel.preambulatory.length === 0 && sel.operative.length === 0}
 						<p class="text-sm text-paper-ink-500">This draft has no clauses yet.</p>
 					{/if}
+
+					<!-- amendments -->
+					{#if sel.amendments.length}
+						<div class="mt-8">
+							<p class="label mb-2 text-paper-ink-500">Amendments</p>
+							<ul class="space-y-2">
+								{#each sel.amendments as a (a.id)}
+									<li class="rounded-lg border border-paper-line bg-paper-100/50 px-3 py-2.5">
+										<div class="flex items-center gap-2 text-[0.65rem] uppercase">
+											<span class={a.type === 'unfriendly' ? 'text-red-800' : 'text-paper-brass'}>{a.type}</span>
+											<span class="text-paper-ink-500">· {a.action}</span>
+											<span class="ml-auto text-paper-ink-500">{a.status}</span>
+										</div>
+										<p class="mt-1 text-sm text-paper-ink-900">{a.text || '(strike the clause)'}</p>
+										<p class="text-xs text-paper-ink-500">{a.proposerCountry || a.proposer}</p>
+										{#if a.status === 'proposed'}
+											<div class="mt-2 flex flex-wrap gap-2">
+												{#if a.type === 'friendly' && (sel.isMainSubmitter || sel.canApprove)}
+													<form method="POST" action="?/acceptAmendment" use:enhance><input type="hidden" name="amendmentId" value={a.id} /><button class="btn btn-brass focus-ring px-3 py-1 text-[0.7rem]">Accept</button></form>
+												{/if}
+												{#if a.type === 'unfriendly' && sel.canApprove}
+													<form method="POST" action="?/voteAmendment" use:enhance><input type="hidden" name="amendmentId" value={a.id} /><button class="btn btn-brass focus-ring px-3 py-1 text-[0.7rem]">Put to vote</button></form>
+												{/if}
+												{#if sel.isMainSubmitter || sel.canApprove}
+													<form method="POST" action="?/rejectAmendment" use:enhance><input type="hidden" name="amendmentId" value={a.id} /><button class="focus-ring rounded-lg border border-paper-line px-3 py-1 text-[0.7rem] text-paper-ink-700 hover:bg-paper-100">Reject</button></form>
+												{/if}
+											</div>
+										{:else if a.status === 'voting'}
+											<p class="mt-1 text-xs text-paper-brass">On the floor for a vote.</p>
+										{/if}
+									</li>
+								{/each}
+							</ul>
+						</div>
+					{/if}
+
+					<!-- propose amendment -->
+					<details class="mt-6 rounded-xl border border-paper-line bg-paper-100/40 p-4">
+						<summary class="cursor-pointer text-sm text-paper-brass">Propose an amendment</summary>
+						<form method="POST" action="?/proposeAmendment" use:enhance={() => async ({ update }) => update({ reset: true })} class="mt-3 space-y-2">
+							<input type="hidden" name="resolutionId" value={sel.id} />
+							<div class="flex gap-2">
+								<select name="type" class="rounded-lg border border-paper-line bg-paper-50 px-3 py-2 text-sm text-paper-ink-900 focus:border-paper-brass focus:outline-none">
+									<option value="friendly">Friendly</option>
+									<option value="unfriendly">Unfriendly</option>
+								</select>
+								<select name="action" class="rounded-lg border border-paper-line bg-paper-50 px-3 py-2 text-sm text-paper-ink-900 focus:border-paper-brass focus:outline-none">
+									<option value="amend">Amend a clause</option>
+									<option value="strike">Strike a clause</option>
+									<option value="add">Add a clause</option>
+								</select>
+							</div>
+							<select name="targetClauseId" class="w-full rounded-lg border border-paper-line bg-paper-50 px-3 py-2 text-sm text-paper-ink-900 focus:border-paper-brass focus:outline-none">
+								<option value="">— target clause (for amend / strike) —</option>
+								{#each sel.preambulatory as c, i (c.id)}<option value={c.id}>Preamble {i + 1}</option>{/each}
+								{#each sel.operative as c, i (c.id)}<option value={c.id}>Operative {i + 1}</option>{/each}
+							</select>
+							<textarea name="text" rows="2" placeholder="New clause text (for amend / add)…" class="w-full rounded-lg border border-paper-line bg-paper-50 px-3 py-2 text-sm text-paper-ink-900 placeholder:text-paper-ink-500 focus:border-paper-brass focus:outline-none"></textarea>
+							<button class="btn btn-brass focus-ring py-2 text-xs">Submit amendment</button>
+						</form>
+					</details>
 
 					<!-- add clause -->
 					{#if sel.canEdit}

@@ -12,12 +12,13 @@ import {
 	points,
 	votes,
 	ballots,
-	resolutions
+	resolutions,
+	amendments
 } from '$lib/server/db/schema';
 import { loadCommittee, assertMember, assertChair } from '$lib/server/auth/guards';
 import { getCommitteeState } from '$lib/server/committeeState';
 import { presetFor, tallyBallots, decide, motionDef, motionPrecedence, type BallotChoice } from '$lib/server/procedure';
-import { executeMotion } from '$lib/server/floor';
+import { executeMotion, applyAmendment } from '$lib/server/floor';
 import { audit } from '$lib/server/audit';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
@@ -286,6 +287,12 @@ export const actions: Actions = {
 			}
 		} else if (vote.subjectType === 'resolution' && vote.subjectId) {
 			await db.update(resolutions).set({ status: result === 'passed' ? 'adopted' : 'failed' }).where(eq(resolutions.id, vote.subjectId));
+		} else if (vote.subjectType === 'amendment' && vote.subjectId) {
+			const [a] = await db.select().from(amendments).where(eq(amendments.id, vote.subjectId));
+			if (a) {
+				await db.update(amendments).set({ status: result === 'passed' ? 'passed' : 'failed' }).where(eq(amendments.id, a.id));
+				if (result === 'passed') await applyAmendment(a);
+			}
 		}
 
 		await audit(committee, chair.id, 'close_vote', { voteId: vote.id, subjectType: vote.subjectType, result, tally: t });
