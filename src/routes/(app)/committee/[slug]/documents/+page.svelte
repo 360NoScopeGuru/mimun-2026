@@ -65,7 +65,7 @@
 
 		<!-- Committee documents -->
 		<section>
-			<h1 class="display text-3xl text-paper-ink-900">Documents</h1>
+			<h1 class="letterpress display text-3xl text-paper-ink-900">Documents</h1>
 			<p class="mt-1 text-sm text-paper-ink-500">Background guide, rules of procedure, agenda and other official papers.</p>
 
 			<ul class="mt-5 divide-y divide-paper-line border-y border-paper-line">
@@ -106,7 +106,7 @@
 
 		<!-- Position papers -->
 		<section class="mt-10">
-			<h2 class="display text-2xl text-paper-ink-900">Position papers</h2>
+			<h2 class="letterpress display text-2xl text-paper-ink-900">Position papers</h2>
 
 			{#if data.isChair}
 				<p class="mt-1 text-sm text-paper-ink-500">Submitted by the delegations of this committee.</p>
@@ -175,7 +175,7 @@
 		<!-- Adopted resolutions archive -->
 		{#if data.adopted.length}
 			<section class="mt-10">
-				<h2 class="display text-2xl text-paper-ink-900">Adopted resolutions</h2>
+				<h2 class="letterpress display text-2xl text-paper-ink-900">Adopted resolutions</h2>
 				<ul class="mt-4 divide-y divide-paper-line border-y border-paper-line">
 					{#each data.adopted as r (r.id)}
 						<li class="flex items-center gap-3 py-3">
