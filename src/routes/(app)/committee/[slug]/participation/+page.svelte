@@ -85,6 +85,32 @@
 		a.remove();
 		URL.revokeObjectURL(url);
 	}
+
+	// AI session summary (chair rapporteur)
+	let summary = $state('');
+	let summaryProvider = $state('');
+	let summarizing = $state(false);
+	let summaryError = $state('');
+
+	async function generateSummary() {
+		if (summarizing) return;
+		summarizing = true;
+		summaryError = '';
+		summary = '';
+		try {
+			const res = await fetch(`/committee/${data.committee.slug}/summary`, { method: 'POST' });
+			const body = await res.json().catch(() => ({}));
+			if (!res.ok) summaryError = body.message || 'Could not generate a summary right now.';
+			else {
+				summary = body.summary;
+				summaryProvider = body.provider;
+			}
+		} catch {
+			summaryError = 'Could not reach the summariser.';
+		} finally {
+			summarizing = false;
+		}
+	}
 </script>
 
 <svelte:head><title>Participation — {data.committee.name}</title></svelte:head>
@@ -100,6 +126,37 @@
 			</div>
 			<button type="button" class="btn btn-brass focus-ring px-4 py-2 text-sm" onclick={exportCsv}>Export CSV</button>
 		</div>
+
+		<!-- AI session summary -->
+		{#if data.aiConfigured}
+			<div class="card mt-6 p-5">
+				<div class="flex flex-wrap items-center justify-between gap-3">
+					<div>
+						<p class="label label-brass">Session summary</p>
+						<p class="mt-1 text-xs text-ink-500">
+							A rapporteur-style recap drawn from attendance, debate, motions, and votes.
+						</p>
+					</div>
+					<button
+						type="button"
+						onclick={generateSummary}
+						disabled={summarizing}
+						class="btn btn-brass focus-ring px-4 py-2 text-sm disabled:opacity-40"
+					>
+						{summarizing ? 'Writing…' : summary ? 'Regenerate' : 'Generate'}
+					</button>
+				</div>
+				{#if summaryError}<p class="mt-3 text-sm text-signal-amber">{summaryError}</p>{/if}
+				{#if summary}
+					<div
+						class="mt-4 whitespace-pre-wrap rounded-xl border border-white/[0.07] bg-white/[0.02] p-4 text-sm leading-relaxed text-ink-200"
+					>
+						{summary}
+					</div>
+					{#if summaryProvider}<p class="label mt-2 text-[0.55rem] text-ink-600">via {summaryProvider}</p>{/if}
+				{/if}
+			</div>
+		{/if}
 
 		<!-- table -->
 		<div class="card mt-6 overflow-x-auto">

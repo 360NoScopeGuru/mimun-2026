@@ -1,8 +1,41 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import type { PageData, ActionData } from './$types';
+	import AiFeedback from '$lib/components/AiFeedback.svelte';
+	import type { Feedback } from '$lib/feedback';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
+
+	// AI position-paper review (paste a draft → structured feedback)
+	let draft = $state('');
+	let paperFeedback = $state<Feedback | null>(null);
+	let paperProvider = $state('');
+	let reviewing = $state(false);
+	let reviewError = $state('');
+
+	async function reviewDraft() {
+		if (draft.trim().length < 80 || reviewing) return;
+		reviewing = true;
+		reviewError = '';
+		paperFeedback = null;
+		try {
+			const res = await fetch(`/committee/${data.committee.slug}/documents/feedback`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ text: draft })
+			});
+			const body = await res.json().catch(() => ({}));
+			if (!res.ok) reviewError = body.message || 'Could not generate feedback right now.';
+			else {
+				paperFeedback = body.feedback;
+				paperProvider = body.provider;
+			}
+		} catch {
+			reviewError = 'Could not reach the reviewer.';
+		} finally {
+			reviewing = false;
+		}
+	}
 
 	const kindLabel: Record<string, string> = {
 		background_guide: 'Background guide',
@@ -106,6 +139,36 @@
 					<input type="file" name="file" required class="block w-full text-sm text-paper-ink-700 file:mr-3 file:rounded-lg file:border-0 file:bg-paper-brass file:px-3 file:py-1.5 file:text-xs file:text-paper-50" />
 					<button class="btn btn-brass focus-ring mt-3 py-2 text-xs">{data.myPaper ? 'Replace' : 'Submit'}</button>
 				</form>
+
+				<!-- AI draft review (paste before you submit) -->
+				{#if data.aiConfigured}
+					<div class="mt-4 rounded-xl border border-paper-line bg-paper-100/60 p-4">
+						<p class="label mb-1 text-paper-ink-500">Get feedback on a draft</p>
+						<p class="mb-2 text-xs text-paper-ink-500">
+							Paste your position paper — the parliamentarian reviews diplomatic tone, accuracy to your
+							country's policy, feasibility, and structure before you submit.
+						</p>
+						<textarea
+							bind:value={draft}
+							rows="6"
+							placeholder="Paste your position paper text…"
+							class="w-full rounded-lg border border-paper-line bg-paper-50 px-3 py-2 text-sm text-paper-ink-900 placeholder:text-paper-ink-500 focus:border-paper-brass focus:outline-none"
+						></textarea>
+						<div class="mt-2 flex items-center gap-3">
+							<button
+								type="button"
+								onclick={reviewDraft}
+								disabled={draft.trim().length < 80 || reviewing}
+								class="btn btn-brass focus-ring px-3 py-1.5 text-xs disabled:opacity-40"
+							>
+								{reviewing ? 'Reviewing…' : 'Get feedback'}
+							</button>
+							<span class="font-mono text-xs text-paper-ink-500">{draft.trim().length} chars</span>
+						</div>
+						{#if reviewError}<p class="mt-2 text-sm text-[color:var(--color-signal-red)]">{reviewError}</p>{/if}
+						{#if paperFeedback}<div class="mt-3"><AiFeedback feedback={paperFeedback} provider={paperProvider} /></div>{/if}
+					</div>
+				{/if}
 			{/if}
 		</section>
 

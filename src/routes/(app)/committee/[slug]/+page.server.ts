@@ -22,6 +22,7 @@ import { getCommitteeState } from '$lib/server/committeeState';
 import { presetFor, tallyBallots, decide, motionDef, motionPrecedence, type BallotChoice } from '$lib/server/procedure';
 import { executeMotion, applyAmendment } from '$lib/server/floor';
 import { audit } from '$lib/server/audit';
+import { isAiConfigured } from '$lib/server/ai';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
 	const committee = await loadCommittee(params.slug);
@@ -35,7 +36,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		.where(and(eq(delegates.committeeId, committee.id), eq(delegates.active, 1)))
 		.orderBy(delegates.country);
 
-	return { committee, state, members };
+	return { committee, state, members, aiConfigured: isAiConfigured() };
 };
 
 const secondsFromNow = (s: number) => new Date(Date.now() + s * 1000);

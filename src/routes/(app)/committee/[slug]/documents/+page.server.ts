@@ -5,6 +5,7 @@ import { db } from '$lib/server/db';
 import { files, resolutions, delegates } from '$lib/server/db/schema';
 import { loadCommittee, assertMember, assertChair, isChair } from '$lib/server/auth/guards';
 import { storeFile, validateUpload, type FileKind } from '$lib/server/storage';
+import { isAiConfigured } from '$lib/server/ai';
 
 const DOC_KINDS: FileKind[] = ['background_guide', 'rop', 'agenda', 'study_guide', 'other'];
 
@@ -46,7 +47,15 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 			.orderBy(desc(resolutions.approvedAt))
 	]);
 
-	return { committee, isChair: chair, documents, myPaper: myPaper[0] ?? null, allPapers, adopted };
+	return {
+		committee,
+		isChair: chair,
+		documents,
+		myPaper: myPaper[0] ?? null,
+		allPapers,
+		adopted,
+		aiConfigured: isAiConfigured()
+	};
 };
 
 export const actions: Actions = {

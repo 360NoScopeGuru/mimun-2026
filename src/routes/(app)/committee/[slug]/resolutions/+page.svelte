@@ -1,9 +1,49 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import type { PageData } from './$types';
+	import AiFeedback from '$lib/components/AiFeedback.svelte';
+	import type { Feedback } from '$lib/feedback';
 
 	let { data }: { data: PageData } = $props();
 	const sel = $derived(data.selected);
+
+	// AI draft review
+	let feedback = $state<Feedback | null>(null);
+	let feedbackProvider = $state('');
+	let reviewing = $state(false);
+	let reviewError = $state('');
+
+	async function requestFeedback() {
+		if (!sel || reviewing) return;
+		reviewing = true;
+		reviewError = '';
+		feedback = null;
+		try {
+			const res = await fetch(`/committee/${data.committee.slug}/resolutions/feedback`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ resolutionId: sel.id })
+			});
+			const body = await res.json().catch(() => ({}));
+			if (!res.ok) reviewError = body.message || 'Could not generate feedback right now.';
+			else {
+				feedback = body.feedback;
+				feedbackProvider = body.provider;
+			}
+		} catch {
+			reviewError = 'Could not reach the reviewer.';
+		} finally {
+			reviewing = false;
+		}
+	}
+
+	// Clear stale feedback when switching to a different draft.
+	$effect(() => {
+		sel?.id;
+		feedback = null;
+		feedbackProvider = '';
+		reviewError = '';
+	});
 
 	const roleLabel: Record<string, string> = { main_submitter: 'Main submitter', co_submitter: 'Co-submitter', signatory: 'Signatory' };
 
@@ -141,6 +181,33 @@
 
 					{#if sel.preambulatory.length === 0 && sel.operative.length === 0}
 						<p class="text-sm text-paper-ink-500">This draft has no clauses yet.</p>
+					{/if}
+
+					<!-- AI draft review -->
+					{#if data.aiConfigured && (sel.preambulatory.length > 0 || sel.operative.length > 0)}
+						<div class="mt-6 border-t border-paper-line pt-4">
+							{#if reviewing}
+								<p class="text-sm text-paper-ink-500">Reviewing the draft against THIMUN form and substance…</p>
+							{:else if feedback}
+								<AiFeedback {feedback} provider={feedbackProvider} />
+								<button
+									type="button"
+									onclick={requestFeedback}
+									class="focus-ring mt-3 rounded-lg border border-paper-line px-3 py-1.5 text-xs text-paper-ink-700 hover:bg-paper-100"
+								>
+									Review again
+								</button>
+							{:else}
+								<button
+									type="button"
+									onclick={requestFeedback}
+									class="focus-ring rounded-lg border border-paper-line px-3 py-1.5 text-xs text-paper-ink-700 hover:bg-paper-100"
+								>
+									Ask the parliamentarian to review this draft
+								</button>
+								{#if reviewError}<p class="mt-2 text-sm text-[color:var(--color-signal-red)]">{reviewError}</p>{/if}
+							{/if}
+						</div>
 					{/if}
 
 					<!-- amendments -->

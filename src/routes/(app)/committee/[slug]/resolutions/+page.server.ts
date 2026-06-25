@@ -5,6 +5,7 @@ import { db } from '$lib/server/db';
 import { resolutions, resolutionClauses, resolutionSponsors, amendments, delegates } from '$lib/server/db/schema';
 import { loadCommittee, assertMember, isChair } from '$lib/server/auth/guards';
 import { applyAmendment, openSubstantiveVote } from '$lib/server/floor';
+import { isAiConfigured } from '$lib/server/ai';
 
 export const load: PageServerLoad = async ({ params, locals, url }) => {
 	const committee = await loadCommittee(params.slug);
@@ -50,7 +51,7 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
 		}
 	}
 
-	return { committee, list, selected };
+	return { committee, list, selected, aiConfigured: isAiConfigured() };
 };
 
 export const actions: Actions = {

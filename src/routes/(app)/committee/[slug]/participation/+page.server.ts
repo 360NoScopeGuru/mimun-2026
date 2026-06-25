@@ -1,6 +1,7 @@
 import type { PageServerLoad } from './$types';
 import { loadCommittee, assertChair } from '$lib/server/auth/guards';
 import { getParticipation } from '$lib/server/participation';
+import { isAiConfigured } from '$lib/server/ai';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
 	const committee = await loadCommittee(params.slug);
@@ -9,5 +10,5 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 	const rows = await getParticipation(committee.id);
 	rows.sort((a, b) => b.score - a.score);
 
-	return { committee, rows };
+	return { committee, rows, aiConfigured: isAiConfigured() };
 };

@@ -38,6 +38,45 @@
 		poll().catch(() => {});
 	}
 
+	// AI parliamentarian (rules Q&A)
+	const askSuggestions = [
+		'Can I move to a moderated caucus now?',
+		'What majority adopts a resolution?',
+		'How do I propose an amendment?'
+	];
+	let askQ = $state('');
+	let askAnswer = $state('');
+	let askProvider = $state('');
+	let asking = $state(false);
+	let askError = $state('');
+
+	async function submitAsk(q = askQ) {
+		const question = q.trim();
+		if (!question || asking) return;
+		askQ = question;
+		asking = true;
+		askError = '';
+		askAnswer = '';
+		try {
+			const res = await fetch(`/committee/${data.committee.slug}/parliamentarian`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ question })
+			});
+			const body = await res.json().catch(() => ({}));
+			if (!res.ok) {
+				askError = body.message || 'The parliamentarian is unavailable right now.';
+			} else {
+				askAnswer = body.answer;
+				askProvider = body.provider;
+			}
+		} catch {
+			askError = 'Could not reach the parliamentarian.';
+		} finally {
+			asking = false;
+		}
+	}
+
 	const num = (v: unknown): number | null => (typeof v === 'number' ? v : null);
 	const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 
@@ -449,6 +488,60 @@
 					</div>
 				</details>
 			</div>
+
+			<!-- AI parliamentarian -->
+			{#if data.aiConfigured}
+				<div class="border-b border-white/[0.07] px-5 py-4">
+					<details>
+						<summary class="flex cursor-pointer items-center justify-between">
+							<span class="label label-brass">Parliamentarian</span>
+							<span class="label text-[0.55rem] text-ink-600">AI</span>
+						</summary>
+						<p class="mt-2 text-xs text-ink-500">
+							Ask about the rules of procedure — quorum, majorities, motions, amendments.
+						</p>
+						<form
+							class="mt-3 flex gap-2"
+							onsubmit={(e) => {
+								e.preventDefault();
+								submitAsk();
+							}}
+						>
+							<input
+								bind:value={askQ}
+								placeholder="e.g. What majority adopts a resolution?"
+								maxlength="500"
+								class="input flex-1 py-1.5 text-xs"
+							/>
+							<button type="submit" disabled={!askQ.trim() || asking} class="btn btn-brass focus-ring px-3 py-1.5 text-xs">
+								{asking ? '…' : 'Ask'}
+							</button>
+						</form>
+						<div class="mt-2 flex flex-wrap gap-1.5">
+							{#each askSuggestions as s (s)}
+								<button
+									type="button"
+									onclick={() => submitAsk(s)}
+									disabled={asking}
+									class="rounded-full border border-white/10 px-2 py-1 text-[0.65rem] text-ink-400 transition-colors hover:border-brass-400/40 hover:text-brass-200 disabled:opacity-40"
+								>
+									{s}
+								</button>
+							{/each}
+						</div>
+						{#if asking}
+							<p class="mt-3 text-xs text-ink-500">Consulting the rules…</p>
+						{:else if askError}
+							<p class="mt-3 text-xs text-signal-amber">{askError}</p>
+						{:else if askAnswer}
+							<div class="mt-3 rounded-lg border border-brass-400/20 bg-brass-400/[0.04] px-3 py-2.5">
+								<p class="whitespace-pre-wrap text-sm leading-relaxed text-ink-100">{askAnswer}</p>
+								{#if askProvider}<p class="label mt-2 text-[0.55rem] text-ink-600">via {askProvider}</p>{/if}
+							</div>
+						{/if}
+					</details>
+				</div>
+			{/if}
 
 			<!-- Resolution on the table -->
 			{#if resolution}
