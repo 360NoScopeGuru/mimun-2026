@@ -115,7 +115,7 @@
 						{#if sel.designation}<span class="rounded border border-paper-brass/40 px-1.5 py-0.5 font-mono text-[0.65rem] text-paper-brass">{sel.designation}</span>{/if}
 						<span class="text-[0.65rem] text-paper-ink-500 uppercase">{sel.status}</span>
 					</div>
-					<h1 class="display text-3xl text-paper-ink-900">{sel.title}</h1>
+					<h1 class="letterpress display text-3xl text-paper-ink-900">{sel.title}</h1>
 					{#if sel.agendaIssue}<p class="mt-2 text-sm text-paper-ink-500">Agenda issue — {sel.agendaIssue}</p>{/if}
 
 					<div class="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-paper-ink-500">
@@ -154,9 +154,9 @@
 					</div>
 
 					{#if sel.status === 'adopted'}
-						<div class="mt-5 flex items-end justify-between border-t border-paper-line pt-4">
-							<span class="signature text-4xl leading-none text-paper-brass">Adopted by the committee</span>
-							{#if sel.designation}<span class="font-mono text-xs text-paper-ink-500">Res. {sel.designation}</span>{/if}
+						<div class="mt-5 flex items-center gap-4 border-t border-paper-line pt-5">
+							<span class="seal shrink-0"><span class="seal-star">★</span><span class="seal-word">ADOPTED</span></span><span class="signature text-4xl leading-none text-paper-brass">Adopted by the committee</span>
+							{#if sel.designation}<span class="ml-auto font-mono text-xs text-paper-ink-500">Res. {sel.designation}</span>{/if}
 						</div>
 					{/if}
 
@@ -165,7 +165,7 @@
 					<!-- Preambulatory clauses -->
 					<div class="space-y-3 text-paper-ink-900">
 						{#each sel.preambulatory as c (c.id)}
-							<p class="leading-relaxed italic" style="font-family: var(--font-display)">{c.text}</p>
+							<p class="letterpress leading-relaxed italic" style="font-family: var(--font-display)">{c.text}</p>
 						{/each}
 					</div>
 
@@ -173,7 +173,7 @@
 					<ol class="mt-5 space-y-3">
 						{#each sel.operative as c, i (c.id)}
 							<li class="flex gap-3 leading-relaxed text-paper-ink-900">
-								<span class="font-mono text-sm text-paper-brass tabular-nums">{i + 1}.</span>
+								<span class="letterpress font-mono text-sm text-paper-brass tabular-nums">{i + 1}.</span>
 								<span>{c.text}</span>
 							</li>
 						{/each}
