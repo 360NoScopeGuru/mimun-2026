@@ -8,6 +8,7 @@ import { presetFor } from '$lib/server/procedure';
 import { askParliamentarian } from '$lib/server/aiFeatures';
 import { isAiConfigured, AiNotConfiguredError } from '$lib/server/ai';
 import { enforceRate, RATE_RULES } from '$lib/server/rateLimit';
+import { log } from '$lib/server/log';
 
 const MODE_LABEL: Record<string, string> = {
 	closed: 'floor closed',
@@ -49,7 +50,7 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 		return json({ answer: text, provider });
 	} catch (err) {
 		if (err instanceof AiNotConfiguredError) error(503, 'The AI parliamentarian is not configured yet.');
-		console.error('parliamentarian failed', err);
+		log.error('parliamentarian failed', { slug: params.slug }, err);
 		error(502, 'The parliamentarian is unavailable right now. Please try again.');
 	}
 };

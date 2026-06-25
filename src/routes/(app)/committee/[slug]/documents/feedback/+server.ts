@@ -4,6 +4,7 @@ import { loadCommittee, assertMember } from '$lib/server/auth/guards';
 import { reviewPositionPaper } from '$lib/server/aiFeatures';
 import { isAiConfigured, AiNotConfiguredError } from '$lib/server/ai';
 import { enforceRate, RATE_RULES } from '$lib/server/rateLimit';
+import { log } from '$lib/server/log';
 
 export const POST: RequestHandler = async ({ params, request, locals }) => {
 	const committee = await loadCommittee(params.slug);
@@ -27,7 +28,7 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 		return json({ feedback: data, provider });
 	} catch (err) {
 		if (err instanceof AiNotConfiguredError) error(503, 'AI feedback is not configured yet.');
-		console.error('position paper feedback failed', err);
+		log.error('position paper feedback failed', { slug: params.slug }, err);
 		error(502, 'Could not generate feedback right now. Please try again.');
 	}
 };

@@ -5,6 +5,7 @@ import { getSessionStats } from '$lib/server/sessionStats';
 import { summarizeSession } from '$lib/server/aiFeatures';
 import { isAiConfigured, AiNotConfiguredError } from '$lib/server/ai';
 import { enforceRate, RATE_RULES } from '$lib/server/rateLimit';
+import { log } from '$lib/server/log';
 
 // Chair-only: a rapporteur-style recap of the session so far.
 export const POST: RequestHandler = async ({ params, locals }) => {
@@ -21,7 +22,7 @@ export const POST: RequestHandler = async ({ params, locals }) => {
 		return json({ summary: text, provider });
 	} catch (err) {
 		if (err instanceof AiNotConfiguredError) error(503, 'AI summaries are not configured yet.');
-		console.error('session summary failed', err);
+		log.error('session summary failed', { slug: params.slug }, err);
 		error(502, 'Could not generate a summary right now. Please try again.');
 	}
 };

@@ -1,5 +1,6 @@
-import type { Handle } from '@sveltejs/kit';
+import type { Handle, HandleServerError } from '@sveltejs/kit';
 import { getSessionToken, validateSessionToken, setSessionCookie, deleteSessionCookie } from '$lib/server/auth';
+import { log } from '$lib/server/log';
 
 /**
  * Conservative hardening headers applied to every response. Deliberately NOT a
@@ -37,4 +38,16 @@ export const handle: Handle = async ({ event, resolve }) => {
 	const response = await resolve(event);
 	applySecurityHeaders(response.headers);
 	return response;
+};
+
+// Central catch-all for unexpected (5xx) server errors: log with request context
+// (route, method, who) and hand the client a safe, generic message.
+export const handleError: HandleServerError = ({ error, event, status }) => {
+	log.error('unhandled server error', {
+		route: event.route.id,
+		method: event.request.method,
+		status,
+		delegateId: event.locals.delegate?.id ?? null
+	}, error);
+	return { message: 'An unexpected error occurred. The secretariat has been notified.' };
 };
