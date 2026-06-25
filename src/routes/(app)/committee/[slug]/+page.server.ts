@@ -115,6 +115,9 @@ export const actions: Actions = {
 
 		const allowed = vote.method === 'roll_call' ? ['for', 'against', 'abstain', 'pass'] : ['for', 'against', 'abstain'];
 		if (!allowed.includes(choice)) return fail(400, { message: 'Invalid choice' });
+		// A second round exists precisely to make those who passed now vote — so
+		// passing again isn't allowed.
+		if (vote.round > 1 && choice === 'pass') return fail(400, { message: 'You must vote this round — passing is no longer allowed' });
 
 		// Procedural votes: any present delegation. Substantive votes: present and voting only.
 		const [att] = await db

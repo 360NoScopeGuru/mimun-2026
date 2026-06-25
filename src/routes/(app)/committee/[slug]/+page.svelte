@@ -114,7 +114,7 @@
 	const inQueue = $derived(queue.some((q) => q.delegateId === me.id));
 	const canVote = $derived(vote ? (vote.kind === 'substantive' ? att.mine === 'present_and_voting' : att.mine !== 'absent') : false);
 	const voteChoices = $derived<[string, string][]>(
-		vote?.method === 'roll_call'
+		vote?.method === 'roll_call' && vote.round === 1
 			? [['for', 'For'], ['against', 'Against'], ['abstain', 'Abstain'], ['pass', 'Pass']]
 			: [['for', 'For'], ['against', 'Against'], ['abstain', 'Abstain']]
 	);
