@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, integer, bigint, uuid, jsonb, pgEnum, unique, customType } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, integer, bigint, uuid, jsonb, pgEnum, unique, index, customType } from 'drizzle-orm/pg-core';
 
 // Raw binary column for storing uploaded files (position papers, committee docs).
 const bytea = customType<{ data: Buffer; driverData: Buffer }>({
@@ -108,7 +108,7 @@ export const delegates = pgTable('delegates', {
 	inviteCode: text('invite_code').notNull().unique(),
 	active: integer('active').notNull().default(1),
 	createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
-});
+}, (t) => [index('delegates_committee_idx').on(t.committeeId)]);
 
 export const sessions = pgTable('sessions', {
 	id: text('id').primaryKey(),
@@ -132,7 +132,7 @@ export const messages = pgTable('messages', {
 		.references(() => delegates.id),
 	body: text('body').notNull(),
 	createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
-});
+}, (t) => [index('messages_committee_created_idx').on(t.committeeId, t.createdAt)]);
 
 export const speakerQueue = pgTable('speaker_queue', {
 	id: uuid('id').defaultRandom().primaryKey(),
@@ -144,7 +144,7 @@ export const speakerQueue = pgTable('speaker_queue', {
 		.references(() => delegates.id),
 	status: queueStatus('status').notNull().default('waiting'),
 	joinedAt: timestamp('joined_at', { withTimezone: true }).notNull().defaultNow()
-});
+}, (t) => [index('speaker_queue_committee_status_idx').on(t.committeeId, t.status)]);
 
 // One attendance row per delegate per committee, reflecting the current session.
 export const attendance = pgTable(
@@ -193,7 +193,7 @@ export const notes = pgTable('notes', {
 	body: text('body').notNull(),
 	createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 	readAt: timestamp('read_at', { withTimezone: true })
-});
+}, (t) => [index('notes_committee_idx').on(t.committeeId)]);
 
 /* ------------------------------------------------------------------ *
  * Procedure
@@ -214,7 +214,7 @@ export const motions = pgTable('motions', {
 	precedenceRank: integer('precedence_rank').notNull().default(0),
 	createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 	decidedAt: timestamp('decided_at', { withTimezone: true })
-});
+}, (t) => [index('motions_committee_status_idx').on(t.committeeId, t.status)]);
 
 export const points = pgTable('points', {
 	id: uuid('id').defaultRandom().primaryKey(),
@@ -228,7 +228,7 @@ export const points = pgTable('points', {
 	body: text('body').notNull().default(''),
 	createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 	resolvedAt: timestamp('resolved_at', { withTimezone: true })
-});
+}, (t) => [index('points_committee_idx').on(t.committeeId)]);
 
 /* ------------------------------------------------------------------ *
  * Voting
@@ -255,7 +255,7 @@ export const votes = pgTable('votes', {
 	tallyAbstain: integer('tally_abstain').notNull().default(0),
 	opensAt: timestamp('opens_at', { withTimezone: true }).notNull().defaultNow(),
 	closesAt: timestamp('closes_at', { withTimezone: true })
-});
+}, (t) => [index('votes_committee_status_idx').on(t.committeeId, t.status)]);
 
 export const ballots = pgTable(
 	'ballots',
@@ -291,7 +291,7 @@ export const resolutions = pgTable('resolutions', {
 	createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 	approvedAt: timestamp('approved_at', { withTimezone: true }),
 	introducedAt: timestamp('introduced_at', { withTimezone: true })
-});
+}, (t) => [index('resolutions_committee_idx').on(t.committeeId)]);
 
 export const resolutionClauses = pgTable('resolution_clauses', {
 	id: uuid('id').defaultRandom().primaryKey(),
@@ -302,7 +302,7 @@ export const resolutionClauses = pgTable('resolution_clauses', {
 	position: integer('position').notNull().default(0),
 	text: text('text').notNull(),
 	createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
-});
+}, (t) => [index('resolution_clauses_resolution_idx').on(t.resolutionId)]);
 
 export const resolutionSponsors = pgTable(
 	'resolution_sponsors',
@@ -334,7 +334,7 @@ export const amendments = pgTable('amendments', {
 	status: amendmentStatus('status').notNull().default('proposed'),
 	voteId: uuid('vote_id').references(() => votes.id),
 	createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
-});
+}, (t) => [index('amendments_resolution_idx').on(t.resolutionId)]);
 
 /* ------------------------------------------------------------------ *
  * Integrity
@@ -372,7 +372,7 @@ export const files = pgTable('files', {
 		.notNull()
 		.references(() => delegates.id),
 	createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
-});
+}, (t) => [index('files_committee_idx').on(t.committeeId)]);
 
 /* ------------------------------------------------------------------ *
  * Infrastructure
