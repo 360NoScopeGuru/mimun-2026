@@ -193,7 +193,7 @@
 			<a href="/committee/{data.committee.slug}/documents" class="hidden text-xs text-ink-400 transition-colors hover:text-brass-300 sm:block">Documents</a>
 			{#if isChair}<a href="/committee/{data.committee.slug}/participation" class="hidden text-xs text-ink-400 transition-colors hover:text-brass-300 sm:block">Participation</a>{/if}
 			{#if floor.mode === 'moderated_caucus' || floor.mode === 'unmoderated_caucus'}
-				<div class="rounded-lg border border-brass-600/30 bg-brass-500/[0.08] px-3 py-1.5">
+				<div class="rounded-lg border border-brass-600/30 bg-brass-500/[0.08] px-3 py-1.5 shadow-[inset_0_-1px_3px_rgba(0,0,0,0.4)]">
 					<Timer endsAt={floor.caucusTimerEndsAt} label="Caucus" />
 					{#if floor.caucusTopic}<p class="mt-0.5 max-w-[14rem] truncate text-[0.7rem] text-ink-400">{floor.caucusTopic}</p>{/if}
 				</div>
@@ -300,8 +300,8 @@
 						{#each [['for', 'For', 'bg-vote-for'], ['against', 'Against', 'bg-vote-against'], ['abstain', 'Abstain', 'bg-vote-abstain']] as [key, text, color] (key)}
 							<div class="flex items-center gap-2">
 								<span class="w-16 text-xs text-ink-300">{text}</span>
-								<div class="h-2 flex-1 overflow-hidden rounded-full bg-white/[0.06]">
-									<div class="{color} h-full rounded-full" style="width: {tallyBase + vote.tally.abstain > 0 ? (vote.tally[key as 'for'] / (tallyBase + vote.tally.abstain)) * 100 : 0}%"></div>
+								<div class="h-2 flex-1 overflow-hidden rounded-full bg-black/30 shadow-[inset_0_1px_2px_rgba(0,0,0,0.6)]">
+									<div class="{color} h-full rounded-full shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]" style="width: {tallyBase + vote.tally.abstain > 0 ? (vote.tally[key as 'for'] / (tallyBase + vote.tally.abstain)) * 100 : 0}%"></div>
 								</div>
 								<span class="w-6 text-right font-mono text-xs tabular-nums text-ink-200">{vote.tally[key as 'for']}</span>
 							</div>
@@ -346,9 +346,9 @@
 			<div class="border-b border-white/[0.07] px-5 py-4">
 				<p class="label label-brass">Speaking now</p>
 				{#if floor.currentSpeaker}
-					<div class="mt-3 flex items-center justify-between gap-3 rounded-xl border border-brass-600/30 bg-brass-500/[0.08] px-4 py-3">
+					<div class="placard mt-3 flex items-center justify-between gap-3">
 						<div class="min-w-0">
-							<p class="truncate text-sm font-semibold text-ink-50">{floor.currentSpeaker.name}</p>
+							<p class="truncate text-sm font-semibold text-ink-50 [text-shadow:0_1px_0_rgba(0,0,0,0.55)]">{floor.currentSpeaker.name}</p>
 							{#if floor.currentSpeaker.country}<p class="label text-[0.625rem] text-ink-400">{floor.currentSpeaker.country}</p>{/if}
 						</div>
 						<Timer endsAt={floor.speakerTimerEndsAt} />
