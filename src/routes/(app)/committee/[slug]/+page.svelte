@@ -165,9 +165,16 @@
 	}
 
 	// Re-poll immediately after a floor-changing action so the room feels live.
-	// (No invalidateAll/update() — the room is driven entirely by poll().)
-	const refresh: SubmitFunction = () => async () => {
-		await poll().catch(() => {});
+	// (No invalidateAll/update() — the room is driven entirely by poll().) Also
+	// disable the clicked button while the action is in flight, so a laggy
+	// double-tap can't double-cast a ballot or double-recognize a speaker.
+	const refresh: SubmitFunction = ({ submitter }) => {
+		const btn = submitter instanceof HTMLButtonElement ? submitter : null;
+		if (btn) btn.disabled = true;
+		return async () => {
+			await poll().catch(() => {});
+			if (btn) btn.disabled = false;
+		};
 	};
 
 	// Self-scheduling poll with exponential backoff + a connection indicator. On
