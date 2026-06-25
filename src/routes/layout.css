@@ -36,6 +36,7 @@
 	--color-ink-900: #0a0f1d; /* primary chamber background */
 	--color-ink-850: #0d1322;
 	--color-ink-800: #111829;
+	--color-ink-750: #151d2f; /* elevated card surface */
 	--color-ink-700: #1a2236;
 	--color-ink-600: #283145;
 	--color-ink-500: #3c465c;
@@ -169,15 +170,30 @@ body {
    Components
 ----------------------------------------------------------------*/
 
+/* Elevation: on near-black, *surface contrast* reads better than shadow alpha,
+   so a card is a genuinely lighter surface (ink-750→850) that sits above the
+   ink-900 chamber, with a hairline top sheen + a real ambient shadow. */
 .card {
-	border: 1px solid rgba(255, 255, 255, 0.06);
-	background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.012));
+	border: 1px solid rgba(255, 255, 255, 0.08);
+	background: linear-gradient(180deg, var(--color-ink-750), var(--color-ink-850));
 	border-radius: 0.875rem;
 	box-shadow:
-		inset 0 1px 0 rgba(255, 255, 255, 0.06),
-		inset 0 -1px 0 rgba(0, 0, 0, 0.3),
-		0 1px 2px rgba(0, 0, 0, 0.35),
-		0 18px 36px -24px rgba(0, 0, 0, 0.9);
+		inset 0 1px 0 rgba(255, 255, 255, 0.07),
+		0 1px 2px rgba(0, 0, 0, 0.5),
+		0 22px 40px -24px rgba(0, 0, 0, 1);
+}
+
+/* The next tier up — the live-action surface (open vote, who's speaking).
+   Lighter still, a brass-tinted edge, lifted higher. The eye lands here. */
+.card-live {
+	position: relative;
+	border: 1px solid rgba(205, 168, 92, 0.22);
+	background: linear-gradient(180deg, var(--color-ink-700), var(--color-ink-800));
+	border-radius: 0.875rem;
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.09),
+		0 1px 2px rgba(0, 0, 0, 0.5),
+		0 26px 46px -22px rgba(0, 0, 0, 1);
 }
 
 /* Buttons */
@@ -400,6 +416,15 @@ body {
 }
 .pulse-dot {
 	animation: pulse-dot 1.6s ease-in-out infinite;
+}
+
+/* Touch: guarantee a 44px hit target for every button/input on coarse pointers
+   (tablets/phones), regardless of a component's compact padding. */
+@media (pointer: coarse) {
+	.btn,
+	.input {
+		min-height: 44px;
+	}
 }
 
 @media (prefers-reduced-motion: reduce) {
