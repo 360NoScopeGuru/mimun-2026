@@ -282,30 +282,36 @@ export const actions: Actions = {
 		const t = tallyBallots(cast.map((c) => c.choice as BallotChoice));
 		const result = decide(t, vote.majorityRule);
 
-		await db
-			.update(votes)
-			.set({ status: 'closed', result, tallyFor: t.for, tallyAgainst: t.against, tallyAbstain: t.abstain, closesAt: new Date() })
-			.where(eq(votes.id, vote.id));
+		// Atomic: close the vote, return the floor to debate, and apply the outcome
+		// to its subject together. A mid-sequence failure must not leave a closed
+		// vote with an un-updated motion/resolution/amendment (or an amendment
+		// marked passed whose clause edit never landed).
+		await db.transaction(async (tx) => {
+			await tx
+				.update(votes)
+				.set({ status: 'closed', result, tallyFor: t.for, tallyAgainst: t.against, tallyAbstain: t.abstain, closesAt: new Date() })
+				.where(eq(votes.id, vote.id));
 
-		// Default: return to formal debate (executeMotion below may override the mode).
-		await db.update(committeeFloor).set({ mode: 'formal_debate', updatedAt: new Date() }).where(eq(committeeFloor.committeeId, committee.id));
+			// Default: return to formal debate (executeMotion below may override the mode).
+			await tx.update(committeeFloor).set({ mode: 'formal_debate', updatedAt: new Date() }).where(eq(committeeFloor.committeeId, committee.id));
 
-		// Apply the outcome to the subject.
-		if (vote.subjectType === 'motion' && vote.subjectId) {
-			const [m] = await db.select().from(motions).where(eq(motions.id, vote.subjectId));
-			if (m) {
-				await db.update(motions).set({ status: result === 'passed' ? 'passed' : 'failed', decidedAt: new Date() }).where(eq(motions.id, m.id));
-				if (result === 'passed') await executeMotion(committee, m);
+			// Apply the outcome to the subject.
+			if (vote.subjectType === 'motion' && vote.subjectId) {
+				const [m] = await tx.select().from(motions).where(eq(motions.id, vote.subjectId));
+				if (m) {
+					await tx.update(motions).set({ status: result === 'passed' ? 'passed' : 'failed', decidedAt: new Date() }).where(eq(motions.id, m.id));
+					if (result === 'passed') await executeMotion(committee, m, tx);
+				}
+			} else if (vote.subjectType === 'resolution' && vote.subjectId) {
+				await tx.update(resolutions).set({ status: result === 'passed' ? 'adopted' : 'failed' }).where(eq(resolutions.id, vote.subjectId));
+			} else if (vote.subjectType === 'amendment' && vote.subjectId) {
+				const [a] = await tx.select().from(amendments).where(eq(amendments.id, vote.subjectId));
+				if (a) {
+					await tx.update(amendments).set({ status: result === 'passed' ? 'passed' : 'failed' }).where(eq(amendments.id, a.id));
+					if (result === 'passed') await applyAmendment(a, tx);
+				}
 			}
-		} else if (vote.subjectType === 'resolution' && vote.subjectId) {
-			await db.update(resolutions).set({ status: result === 'passed' ? 'adopted' : 'failed' }).where(eq(resolutions.id, vote.subjectId));
-		} else if (vote.subjectType === 'amendment' && vote.subjectId) {
-			const [a] = await db.select().from(amendments).where(eq(amendments.id, vote.subjectId));
-			if (a) {
-				await db.update(amendments).set({ status: result === 'passed' ? 'passed' : 'failed' }).where(eq(amendments.id, a.id));
-				if (result === 'passed') await applyAmendment(a);
-			}
-		}
+		});
 
 		await audit(committee, chair.id, 'close_vote', { voteId: vote.id, subjectType: vote.subjectType, result, tally: t });
 		return { success: true, result };
@@ -393,8 +399,10 @@ export const actions: Actions = {
 		const [m] = await db.select().from(motions).where(and(eq(motions.id, motionId), eq(motions.committeeId, committee.id)));
 		if (!m || m.status !== 'proposed') return fail(400);
 
-		await db.update(motions).set({ status: 'passed', decidedAt: new Date() }).where(eq(motions.id, m.id));
-		await executeMotion(committee, m);
+		await db.transaction(async (tx) => {
+			await tx.update(motions).set({ status: 'passed', decidedAt: new Date() }).where(eq(motions.id, m.id));
+			await executeMotion(committee, m, tx);
+		});
 		await audit(committee, chair.id, 'adopt_motion_by_consent', { motionId: m.id, type: m.type });
 		return { success: true };
 	},

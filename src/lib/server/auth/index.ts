@@ -39,6 +39,14 @@ export async function validateSessionToken(token: string) {
 		return { session: null, delegate: null };
 	}
 
+	// Revoke immediately if the delegate has been deactivated (expelled / removed).
+	// Without this, deactivation only blocks new logins — a live session would
+	// otherwise stay valid for up to the 14-day window.
+	if (result.delegate.active !== 1) {
+		await db.delete(sessions).where(eq(sessions.id, sessionId));
+		return { session: null, delegate: null };
+	}
+
 	return result;
 }
 
