@@ -143,7 +143,7 @@
 	 * ---------------------------------------------------------------- */
 	async function poll() {
 		const res = await fetch(`/committee/${data.committee.slug}/state?since=${encodeURIComponent(new Date().toISOString())}`);
-		if (!res.ok) return;
+		if (!res.ok) throw new Error(`state ${res.status}`);
 		const u = await res.json();
 		floor = u.floor;
 		att = u.attendance;
@@ -164,14 +164,36 @@
 		board = u.vote ? u.board : [];
 	}
 
+	// Self-scheduling poll with exponential backoff + a board reconnect indicator.
+	let connection = $state<'live' | 'reconnecting'>('live');
+	let pollFails = 0;
+	let pollTimer: ReturnType<typeof setTimeout>;
+	let stopped = false;
+
+	async function pollLoop() {
+		if (stopped) return;
+		let delay = 1000;
+		try {
+			await poll();
+			pollFails = 0;
+			connection = 'live';
+		} catch {
+			pollFails++;
+			if (pollFails >= 2) connection = 'reconnecting';
+			delay = Math.min(15000, 1000 * 2 ** Math.min(pollFails, 4));
+		}
+		if (!stopped) pollTimer = setTimeout(pollLoop, delay);
+	}
+
 	onMount(() => {
-		const i = setInterval(() => poll().catch(() => {}), 1000);
+		pollLoop();
 		const b = setInterval(() => pollBoard().catch(() => {}), 1000);
 		pollBoard().catch(() => {});
 		// Catch a timer that elapses with no state change to re-fire detection.
 		const t = setInterval(() => detectCues(), 1000);
 		return () => {
-			clearInterval(i);
+			stopped = true;
+			clearTimeout(pollTimer);
 			clearInterval(b);
 			clearInterval(t);
 		};
@@ -247,6 +269,7 @@
 	<div class="absolute bottom-8 flex items-center gap-2 text-sm">
 		<span class="h-2 w-2 rounded-full {att.hasQuorum ? 'bg-signal-green' : 'bg-signal-amber'}"></span>
 		<span class="font-mono tabular-nums text-ink-400">{att.present}/{att.total} present · quorum {att.hasQuorum ? 'met' : 'not met'}</span>
+		{#if connection === 'reconnecting'}<span class="font-mono text-signal-amber">· reconnecting…</span>{/if}
 	</div>
 
 	{#if !soundOn}
