@@ -15,17 +15,17 @@
 	</div>
 
 	<div class="mx-auto max-w-3xl px-6 py-8">
-		<h1 class="display text-3xl text-paper-ink-900">Lobbying</h1>
+		<h1 class="letterpress display text-3xl text-paper-ink-900">Lobbying</h1>
 		<p class="mt-1 text-sm text-paper-ink-500">Form blocs, co-sponsor drafts, and merge working papers before they go to the dais.</p>
 
 		{#if form?.message}<p class="mt-4 rounded-lg bg-red-700/10 px-3 py-2 text-sm text-red-800">{form.message}</p>{/if}
 
 		<div class="mt-6 space-y-4">
 			{#each data.items as r (r.id)}
-				<article class="rounded-xl border border-paper-line bg-paper-50 p-5">
+				<article class="rounded-xl border border-paper-line bg-paper-50 p-5 shadow-[0_8px_20px_-12px_rgba(60,50,30,0.3)]">
 					<div class="flex items-start justify-between gap-3">
 						<div class="min-w-0">
-							<h2 class="display text-lg text-paper-ink-900">{r.title}</h2>
+							<h2 class="letterpress display text-lg text-paper-ink-900">{r.title}</h2>
 							{#if r.agendaIssue}<p class="text-xs text-paper-ink-500">{r.agendaIssue}</p>{/if}
 						</div>
 						<a href="/committee/{data.committee.slug}/resolutions?id={r.id}" class="shrink-0 font-mono text-xs text-paper-brass hover:underline">{r.clauses} clauses →</a>
