@@ -2,6 +2,7 @@
 	import { page } from '$app/state';
 	import type { Snippet } from 'svelte';
 	import type { LayoutData } from './$types';
+	import SmallScreenNotice from '$lib/components/SmallScreenNotice.svelte';
 
 	let { data, children }: { data: LayoutData; children: Snippet } = $props();
 
@@ -50,6 +51,7 @@
 	</header>
 
 	<main class="flex-1">
-		{@render children()}
+		<SmallScreenNotice feature="The secretariat console" />
+		<div class="hidden sm:block">{@render children()}</div>
 	</main>
 </div>
