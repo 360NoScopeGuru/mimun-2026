@@ -1,4 +1,5 @@
-import { and, asc, desc, eq, gt, isNull } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, isNull, or } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { db } from './db';
 import {
 	committees,
@@ -11,9 +12,11 @@ import {
 	ballots,
 	motions,
 	points,
+	notes,
 	resolutions
 } from './db/schema';
 import { presetFor, tallyBallots, quorumThreshold, hasQuorum, sortByPrecedence, motionDef, type BallotChoice } from './procedure';
+import { isChair } from './auth/guards';
 
 type Committee = typeof committees.$inferSelect;
 type Delegate = typeof delegates.$inferSelect;
@@ -38,10 +41,13 @@ const MOTION_LABELS: Record<string, string> = {
 export async function getCommitteeState(committee: Committee, delegate: Delegate, sinceISO?: string) {
 	const sinceDate = sinceISO ? new Date(sinceISO) : new Date(0);
 	const preset = presetFor((committee.rulesConfig as { preset?: string })?.preset);
+	const chairView = isChair(delegate); // the dais moderates all notes; delegates see only their own
+	const noteFrom = alias(delegates, 'note_from');
+	const noteTo = alias(delegates, 'note_to');
 
 	const [floorRow] = await db.select().from(committeeFloor).where(eq(committeeFloor.committeeId, committee.id));
 
-	const [messageRows, queueRows, roster, attendanceRows, openVote, latestResolution, pendingMotionRows, pointRows] = await Promise.all([
+	const [messageRows, queueRows, roster, attendanceRows, openVote, latestResolution, pendingMotionRows, pointRows, noteRows] = await Promise.all([
 		db
 			.select({ id: messages.id, body: messages.body, createdAt: messages.createdAt, author: delegates.fullName, country: delegates.country, role: delegates.role })
 			.from(messages)
@@ -87,7 +93,30 @@ export async function getCommitteeState(committee: Committee, delegate: Delegate
 			.innerJoin(delegates, eq(points.byId, delegates.id))
 			.where(and(eq(points.committeeId, committee.id), isNull(points.resolvedAt)))
 			.orderBy(desc(points.createdAt))
-			.limit(10)
+			.limit(10),
+		db
+			.select({
+				id: notes.id,
+				body: notes.body,
+				createdAt: notes.createdAt,
+				readAt: notes.readAt,
+				fromId: notes.fromId,
+				toId: notes.toId,
+				fromName: noteFrom.fullName,
+				fromCountry: noteFrom.country,
+				toName: noteTo.fullName,
+				toCountry: noteTo.country
+			})
+			.from(notes)
+			.innerJoin(noteFrom, eq(notes.fromId, noteFrom.id))
+			.leftJoin(noteTo, eq(notes.toId, noteTo.id))
+			.where(
+				chairView
+					? eq(notes.committeeId, committee.id)
+					: and(eq(notes.committeeId, committee.id), or(eq(notes.fromId, delegate.id), eq(notes.toId, delegate.id)))
+			)
+			.orderBy(asc(notes.createdAt))
+			.limit(200)
 	]);
 
 	// Current speaker (if any)
@@ -171,7 +200,8 @@ export async function getCommitteeState(committee: Committee, delegate: Delegate
 			proposer: m.proposer,
 			proposerCountry: m.proposerCountry
 		})),
-		points: pointRows
+		points: pointRows,
+		notes: noteRows
 	};
 }
 

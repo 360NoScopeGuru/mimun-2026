@@ -180,6 +180,21 @@ export const committeeFloor = pgTable('committee_floor', {
 	updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
 });
 
+// Private diplomatic notes passed between delegations (toId null = to the dais).
+export const notes = pgTable('notes', {
+	id: uuid('id').defaultRandom().primaryKey(),
+	committeeId: uuid('committee_id')
+		.notNull()
+		.references(() => committees.id),
+	fromId: uuid('from_id')
+		.notNull()
+		.references(() => delegates.id),
+	toId: uuid('to_id').references(() => delegates.id),
+	body: text('body').notNull(),
+	createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+	readAt: timestamp('read_at', { withTimezone: true })
+});
+
 /* ------------------------------------------------------------------ *
  * Procedure
  * ------------------------------------------------------------------ */

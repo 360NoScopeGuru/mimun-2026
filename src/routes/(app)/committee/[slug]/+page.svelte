@@ -23,6 +23,20 @@
 	let cstatus = $state(data.state.status);
 	let pendingMotions = $state(data.state.pendingMotions);
 	let points = $state(data.state.points);
+	let notes = $state(data.state.notes);
+
+	// Note-passing
+	const members = data.members;
+	const recipients = $derived(members.filter((m) => m.id !== me.id));
+	let noteTo = $state('dais');
+	let noteBody = $state('');
+	const unreadNotes = $derived(notes.filter((n) => n.toId === me.id && !n.readAt).length);
+
+	async function markNotesRead() {
+		if (unreadNotes === 0) return;
+		await fetch(`/committee/${data.committee.slug}?/markNotesRead`, { method: 'POST', body: new FormData() }).catch(() => {});
+		poll().catch(() => {});
+	}
 
 	const num = (v: unknown): number | null => (typeof v === 'number' ? v : null);
 	const str = (v: unknown): string => (typeof v === 'string' ? v : '');
@@ -102,6 +116,7 @@
 		cstatus = u.status;
 		pendingMotions = u.pendingMotions;
 		points = u.points;
+		notes = u.notes;
 	}
 
 	// Re-poll immediately after a floor-changing action so the room feels live.

@@ -1,9 +1,10 @@
 import { fail } from '@sveltejs/kit';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import type { Actions, PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
 import {
 	committees,
+	delegates,
 	messages,
 	speakerQueue,
 	attendance,
@@ -13,7 +14,8 @@ import {
 	votes,
 	ballots,
 	resolutions,
-	amendments
+	amendments,
+	notes
 } from '$lib/server/db/schema';
 import { loadCommittee, assertMember, assertChair } from '$lib/server/auth/guards';
 import { getCommitteeState } from '$lib/server/committeeState';
@@ -25,7 +27,15 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 	const committee = await loadCommittee(params.slug);
 	const delegate = assertMember(locals.delegate, committee.id);
 	const state = await getCommitteeState(committee, delegate);
-	return { committee, state };
+
+	// Roster for the note-passing recipient picker (rarely changes — not polled).
+	const members = await db
+		.select({ id: delegates.id, name: delegates.fullName, country: delegates.country, role: delegates.role })
+		.from(delegates)
+		.where(and(eq(delegates.committeeId, committee.id), eq(delegates.active, 1)))
+		.orderBy(delegates.country);
+
+	return { committee, state, members };
 };
 
 const secondsFromNow = (s: number) => new Date(Date.now() + s * 1000);
@@ -394,6 +404,37 @@ export const actions: Actions = {
 		const motionId = String((await request.formData()).get('motionId') ?? '');
 		await db.update(motions).set({ status: 'withdrawn', decidedAt: new Date() }).where(and(eq(motions.id, motionId), eq(motions.committeeId, committee.id), eq(motions.status, 'proposed')));
 		await audit(committee, chair.id, 'rule_motion_out_of_order', { motionId });
+		return { success: true };
+	},
+
+	// Private diplomatic note to another delegation (or the dais if toId is empty).
+	sendNote: async ({ request, locals, params }) => {
+		const committee = await loadCommittee(params.slug);
+		const delegate = assertMember(locals.delegate, committee.id);
+
+		const form = await request.formData();
+		const toRaw = String(form.get('toId') ?? '');
+		const toId = toRaw && toRaw !== 'dais' ? toRaw : null;
+		const body = String(form.get('body') ?? '').trim();
+		if (!body) return fail(400, { message: 'Note cannot be empty' });
+		if (body.length > 500) return fail(400, { message: 'Note is too long' });
+
+		if (toId) {
+			const [r] = await db.select({ id: delegates.id }).from(delegates).where(and(eq(delegates.id, toId), eq(delegates.committeeId, committee.id)));
+			if (!r) return fail(400, { message: 'Unknown recipient' });
+		}
+
+		await db.insert(notes).values({ committeeId: committee.id, fromId: delegate.id, toId, body });
+		return { success: true };
+	},
+
+	markNotesRead: async ({ locals, params }) => {
+		const committee = await loadCommittee(params.slug);
+		const delegate = assertMember(locals.delegate, committee.id);
+		await db
+			.update(notes)
+			.set({ readAt: new Date() })
+			.where(and(eq(notes.committeeId, committee.id), eq(notes.toId, delegate.id), isNull(notes.readAt)));
 		return { success: true };
 	},
 
