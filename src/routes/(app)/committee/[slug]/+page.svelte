@@ -151,6 +151,7 @@
 		</div>
 		<div class="flex items-center gap-4">
 			<a href="/committee/{data.committee.slug}/documents" class="hidden text-xs text-ink-400 transition-colors hover:text-brass-300 sm:block">Documents</a>
+			{#if isChair}<a href="/committee/{data.committee.slug}/participation" class="hidden text-xs text-ink-400 transition-colors hover:text-brass-300 sm:block">Participation</a>{/if}
 			{#if floor.mode === 'moderated_caucus' || floor.mode === 'unmoderated_caucus'}
 				<div class="rounded-lg border border-brass-600/30 bg-brass-500/[0.08] px-3 py-1.5">
 					<Timer endsAt={floor.caucusTimerEndsAt} label="Caucus" />
@@ -399,6 +400,53 @@
 						</form>
 					</details>
 				{/if}
+			</div>
+
+			<!-- Notes (private diplomacy) -->
+			<div class="border-b border-white/[0.07] px-5 py-4">
+				<details ontoggle={(e) => { if ((e.currentTarget as HTMLDetailsElement).open) markNotesRead(); }}>
+					<summary class="flex cursor-pointer items-center justify-between">
+						<span class="label label-brass">Notes{isChair ? ' · moderation' : ''}</span>
+						{#if unreadNotes > 0}<span class="rounded-full bg-brass-500 px-1.5 py-0.5 text-[0.6rem] font-semibold text-ink-950">{unreadNotes}</span>{/if}
+					</summary>
+
+					<form
+						method="POST"
+						action="?/sendNote"
+						class="mt-3 flex flex-col gap-2"
+						use:enhance={() => {
+							const sent = noteBody;
+							noteBody = '';
+							return async ({ result }) => {
+								if (result.type === 'failure' || result.type === 'error') noteBody = sent;
+								await poll();
+							};
+						}}
+					>
+						<select name="toId" bind:value={noteTo} class="input py-1.5 text-xs">
+							<option value="dais">The dais</option>
+							{#each recipients as m (m.id)}<option value={m.id}>{m.country || m.name}</option>{/each}
+						</select>
+						<div class="flex gap-2">
+							<input name="body" bind:value={noteBody} placeholder="Private note…" autocomplete="off" maxlength="500" class="input flex-1 py-1.5 text-xs" />
+							<button type="submit" disabled={!noteBody.trim()} class="btn btn-brass focus-ring px-3 py-1.5 text-xs">Pass</button>
+						</div>
+					</form>
+
+					<div class="mt-3 max-h-56 space-y-1.5 overflow-y-auto">
+						{#each notes as n (n.id)}
+							<div class="rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2">
+								<p class="label text-[0.55rem] text-ink-500">
+									{#if n.fromId === me.id}You → {n.toName ? (n.toCountry || n.toName) : 'The dais'}
+									{:else}{n.fromCountry || n.fromName} → {n.toName ? (n.toCountry || n.toName) : 'The dais'}{/if}
+								</p>
+								<p class="mt-0.5 text-sm text-ink-200">{n.body}</p>
+							</div>
+						{:else}
+							<p class="text-xs text-ink-500">No notes yet — pass a private note to another delegation.</p>
+						{/each}
+					</div>
+				</details>
 			</div>
 
 			<!-- Resolution on the table -->
