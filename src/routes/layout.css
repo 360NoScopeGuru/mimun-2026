@@ -115,6 +115,7 @@ body {
 	color-scheme: light;
 	background-color: var(--color-paper-50);
 	background-image:
+		repeating-linear-gradient(0deg, rgba(120, 100, 60, 0.02) 0 1px, transparent 1px 4px),
 		radial-gradient(100% 60% at 50% 0%, rgba(138, 109, 47, 0.04), transparent 70%);
 	color: var(--color-paper-ink-900);
 }
@@ -169,9 +170,14 @@ body {
 ----------------------------------------------------------------*/
 
 .card {
-	border: 1px solid rgba(255, 255, 255, 0.07);
-	background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012));
+	border: 1px solid rgba(255, 255, 255, 0.06);
+	background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.012));
 	border-radius: 0.875rem;
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.06),
+		inset 0 -1px 0 rgba(0, 0, 0, 0.3),
+		0 1px 2px rgba(0, 0, 0, 0.35),
+		0 18px 36px -24px rgba(0, 0, 0, 0.9);
 }
 
 /* Buttons */
@@ -201,20 +207,25 @@ body {
 
 /* Primary — brass */
 .btn-brass {
-	background: var(--color-brass-500);
+	background: linear-gradient(180deg, #e3c079 0%, #c89a4e 48%, #b8924a 52%, #a37f3d 100%);
 	color: #1a130a;
 	font-weight: 600;
-	box-shadow: 0 1px 0 rgba(255, 255, 255, 0.18) inset, 0 8px 24px -12px var(--color-brass-glow);
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.5),
+		inset 0 -1px 0 rgba(0, 0, 0, 0.28),
+		0 1px 2px rgba(0, 0, 0, 0.4),
+		0 10px 22px -12px var(--color-brass-glow);
 }
 .btn-brass:hover:not(:disabled) {
-	background: var(--color-brass-400);
+	background: linear-gradient(180deg, #ecca82 0%, #d0a455 48%, #c39a4f 52%, #ad8743 100%);
 }
 
 /* Ghost — outlined */
 .btn-ghost {
 	border: 1px solid rgba(255, 255, 255, 0.12);
 	color: var(--color-ink-200);
-	background: transparent;
+	background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.012));
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 4px 10px -6px rgba(0, 0, 0, 0.6);
 }
 .btn-ghost:hover:not(:disabled) {
 	background: rgba(255, 255, 255, 0.05);
@@ -240,6 +251,7 @@ body {
 	padding: 0.625rem 0.875rem;
 	color: var(--color-ink-50);
 	font-size: 0.875rem;
+	box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(0, 0, 0, 0.25);
 	transition: border-color 0.18s var(--ease-out-soft), box-shadow 0.18s var(--ease-out-soft);
 }
 .input::placeholder {
@@ -248,7 +260,7 @@ body {
 .input:focus {
 	outline: none;
 	border-color: var(--color-brass-500);
-	box-shadow: 0 0 0 3px var(--color-brass-glow);
+	box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4), 0 0 0 3px var(--color-brass-glow);
 }
 
 /* Emblem mark — a brass roundel for the wordmark */
@@ -262,6 +274,107 @@ body {
 	background: radial-gradient(120% 120% at 30% 20%, rgba(224, 192, 126, 0.18), rgba(10, 15, 29, 0.4));
 	border: 1px solid var(--color-brass-600);
 	box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3), 0 6px 18px -10px var(--color-brass-glow);
+}
+
+/* ---------------------------------------------------------------
+   Tactile primitives — opt-in physical objects, same tokens.
+   .well (recessed) · .placard (raised name-card) · .letterpress
+   (paper deboss) · .seal (poured wax adoption mark).
+----------------------------------------------------------------*/
+
+/* Recessed well — a surface things sit *in* (desks, vote trays) */
+.well {
+	border-radius: 0.85rem;
+	background: linear-gradient(180deg, var(--color-ink-900), var(--color-ink-850));
+	box-shadow: inset 0 3px 8px rgba(0, 0, 0, 0.7), inset 0 -1px 0 rgba(255, 255, 255, 0.03);
+}
+
+/* Placard — a raised delegation name-card; add .raised when lifted to vote.
+   Set --placard-glow inline to tint the lifted shadow to the vote colour. */
+.placard {
+	position: relative;
+	border-radius: 0.5rem;
+	padding: 0.85rem 1.75rem;
+	background: linear-gradient(177deg, var(--color-ink-600) 0%, var(--color-ink-800) 58%, var(--color-ink-900) 100%);
+	border: 1px solid rgba(0, 0, 0, 0.5);
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.1),
+		inset 0 -2px 4px rgba(0, 0, 0, 0.5),
+		0 10px 18px -8px rgba(0, 0, 0, 0.85);
+	transition: transform 0.32s var(--ease-out-soft), box-shadow 0.32s var(--ease-out-soft);
+}
+.placard::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+	pointer-events: none;
+	background: linear-gradient(118deg, transparent 40%, rgba(255, 255, 255, 0.06) 48%, transparent 56%);
+}
+.placard::after {
+	content: '';
+	position: absolute;
+	left: 1rem;
+	right: 1rem;
+	bottom: 0.5rem;
+	height: 2px;
+	border-radius: 2px;
+	background: linear-gradient(90deg, transparent, var(--color-brass-400), transparent);
+	box-shadow: 0 0 8px var(--color-brass-glow);
+}
+.placard.raised {
+	transform: translateY(-12px) rotateX(5deg);
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.14),
+		0 22px 34px -12px var(--placard-glow, var(--color-brass-glow)),
+		0 12px 20px -8px rgba(0, 0, 0, 0.85);
+}
+
+/* Letterpress — ink pressed into paper (use on the Paper surface only) */
+.letterpress {
+	text-shadow: 0 1px 0 rgba(255, 255, 255, 0.75);
+}
+
+/* Wax seal — a poured, struck adoption mark for the Paper surface.
+   <span class="seal"><span class="seal-star">★</span>
+   <span class="seal-word">ADOPTED</span></span> */
+.seal {
+	position: relative;
+	display: inline-flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 0.05rem;
+	width: 92px;
+	height: 92px;
+	border-radius: 50%;
+	transform: rotate(-8deg);
+	background: radial-gradient(62% 58% at 36% 30%, #a8443a, #7a241c 64%, #561512 100%);
+	box-shadow:
+		inset 0 2px 5px rgba(255, 255, 255, 0.28),
+		inset 0 -7px 14px rgba(0, 0, 0, 0.5),
+		0 7px 12px -3px rgba(40, 10, 8, 0.6);
+}
+.seal::before {
+	content: '';
+	position: absolute;
+	inset: 9px;
+	border-radius: 50%;
+	border: 1px solid rgba(0, 0, 0, 0.28);
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+.seal-star {
+	font-size: 0.85rem;
+	color: #f0cdb6;
+	text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.4), 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+.seal-word {
+	font-family: var(--font-accent);
+	font-size: 0.66rem;
+	font-weight: 700;
+	letter-spacing: 0.12em;
+	color: #f0cdb6;
+	text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.45), 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 /* ---------------------------------------------------------------
@@ -292,5 +405,8 @@ body {
 @media (prefers-reduced-motion: reduce) {
 	.pulse-dot {
 		animation: none;
+	}
+	.placard {
+		transition: none;
 	}
 }
