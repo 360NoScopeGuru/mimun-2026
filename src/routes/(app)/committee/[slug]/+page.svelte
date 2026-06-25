@@ -4,6 +4,7 @@
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import type { PageData } from './$types';
 	import Timer from '$lib/components/Timer.svelte';
+	import ActionBar from '$lib/components/ActionBar.svelte';
 
 	let { data }: { data: PageData } = $props();
 	const me = data.delegate!;
@@ -30,6 +31,7 @@
 	const recipients = $derived(members.filter((m) => m.id !== me.id));
 	let noteTo = $state('dais');
 	let noteBody = $state('');
+	let notesOpen = $state(false); // drives the notes drawer (also opened from the mobile action bar)
 	const unreadNotes = $derived(notes.filter((n) => n.toId === me.id && !n.readAt).length);
 
 	async function markNotesRead() {
@@ -445,7 +447,7 @@
 			{/if}
 
 			<!-- Notes (private diplomacy) -->
-			<details class="card p-4" ontoggle={(e) => { if ((e.currentTarget as HTMLDetailsElement).open) markNotesRead(); }}>
+			<details id="dais-notes" bind:open={notesOpen} class="card p-4" ontoggle={(e) => { if ((e.currentTarget as HTMLDetailsElement).open) markNotesRead(); }}>
 				<summary class="flex cursor-pointer select-none items-center justify-between">
 					<span class="label label-brass">Notes{isChair ? ' · moderation' : ''}</span>
 					{#if unreadNotes > 0}<span class="rounded-full bg-brass-500 px-2 py-0.5 text-[0.65rem] font-semibold text-ink-950">{unreadNotes}</span>{/if}
@@ -625,5 +627,35 @@
 				</details>
 			{/if}
 		</aside>
+	</div>
+
+	<!-- Mobile quick actions — the live action is one tap away without scrolling -->
+	<div class="lg:hidden">
+		<ActionBar>
+			{#if vote && !isChair && canVote}
+				{#each voteChoices as [choice, text] (choice)}
+					<form method="POST" action="?/castBallot" use:enhance={refresh}>
+						<input type="hidden" name="voteId" value={vote.id} />
+						<input type="hidden" name="choice" value={choice} />
+						<button class="btn focus-ring w-full {vote.myChoice === choice ? 'btn-brass' : 'btn-ghost'}">{text}</button>
+					</form>
+				{/each}
+			{:else if isChair}
+				<form method="POST" action="?/callNext" use:enhance={refresh}>
+					<button disabled={queue.length === 0} class="btn btn-brass focus-ring w-full">Recognize next</button>
+				</form>
+				{#if vote}
+					<form method="POST" action="?/closeVote" use:enhance={refresh}>
+						<input type="hidden" name="voteId" value={vote.id} />
+						<button class="btn btn-ghost focus-ring w-full">Close vote</button>
+					</form>
+				{/if}
+			{:else}
+				<form method="POST" action={inQueue ? '?/leaveQueue' : '?/joinQueue'} use:enhance={refresh}>
+					<button class="btn focus-ring w-full {inQueue ? 'btn-ghost' : 'btn-brass'}">{inQueue ? 'Withdraw' : 'Raise hand'}</button>
+				</form>
+				<button type="button" class="btn btn-ghost focus-ring w-full" onclick={() => { notesOpen = true; document.getElementById('dais-notes')?.scrollIntoView({ behavior: 'smooth' }); }}>Notes</button>
+			{/if}
+		</ActionBar>
 	</div>
 </div>
