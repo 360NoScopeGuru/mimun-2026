@@ -140,12 +140,16 @@
 
 	async function poll() {
 		const res = await fetch(`/committee/${data.committee.slug}/state?since=${encodeURIComponent(lastEventAt)}`);
-		if (!res.ok) return;
+		if (!res.ok) throw new Error(`state ${res.status}`);
 		const u = await res.json();
 		if (u.messages.length > 0) {
 			const incoming: ChatMessage[] = u.messages;
+			// Drop optimistic placeholders the server now confirms, then de-dupe by id
+			// so a reconnect resync can re-fetch missed messages without doubling them.
 			const confirmed = messages.filter((m) => !m.pending || !incoming.some((i) => i.author === m.author && i.body === m.body));
-			messages = [...confirmed, ...incoming];
+			const byId = new Map<string, ChatMessage>();
+			for (const m of [...confirmed, ...incoming]) byId.set(m.id, m);
+			messages = [...byId.values()];
 			lastEventAt = new Date(incoming[incoming.length - 1].createdAt).toISOString();
 			scrollToBottom();
 		}
@@ -163,13 +167,40 @@
 	// Re-poll immediately after a floor-changing action so the room feels live.
 	// (No invalidateAll/update() — the room is driven entirely by poll().)
 	const refresh: SubmitFunction = () => async () => {
-		await poll();
+		await poll().catch(() => {});
 	};
+
+	// Self-scheduling poll with exponential backoff + a connection indicator. On
+	// reconnect we reset `lastEventAt` so the next poll re-fetches messages missed
+	// while offline (de-duped by id in poll()).
+	let connection = $state<'live' | 'reconnecting'>('live');
+	let pollFails = 0;
+	let pollTimer: ReturnType<typeof setTimeout>;
+	let stopped = false;
+
+	async function pollLoop() {
+		if (stopped) return;
+		let delay = 1000;
+		try {
+			if (pollFails > 0) lastEventAt = new Date(0).toISOString();
+			await poll();
+			pollFails = 0;
+			connection = 'live';
+		} catch {
+			pollFails++;
+			if (pollFails >= 2) connection = 'reconnecting';
+			delay = Math.min(15000, 1000 * 2 ** Math.min(pollFails, 4));
+		}
+		if (!stopped) pollTimer = setTimeout(pollLoop, delay);
+	}
 
 	onMount(() => {
 		scrollToBottom();
-		const i = setInterval(() => poll().catch(() => {}), 1000);
-		return () => clearInterval(i);
+		pollLoop();
+		return () => {
+			stopped = true;
+			clearTimeout(pollTimer);
+		};
 	});
 
 	const tallyBase = $derived(vote ? vote.tally.for + vote.tally.against : 0);
@@ -187,6 +218,11 @@
 				<span class="flex items-center gap-1.5 text-xs text-ink-300">
 					<span class="h-1.5 w-1.5 rounded-full {statusDot[cstatus]}"></span>{statusLabel[cstatus]}
 				</span>
+				{#if connection === 'reconnecting'}
+					<span class="flex items-center gap-1.5 text-xs text-signal-amber" title="Lost contact with the server — retrying">
+						<span class="h-1.5 w-1.5 rounded-full bg-signal-amber pulse-dot"></span>Reconnecting…
+					</span>
+				{/if}
 			</div>
 			<h1 class="display mt-0.5 truncate text-xl text-ink-50">{data.committee.name}</h1>
 		</div>
