@@ -28,7 +28,7 @@
 
 		<form
 			method="POST"
-			class="card p-7 shadow-[0_40px_90px_-50px_rgba(0,0,0,0.9)]"
+			class="card p-7 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_40px_90px_-50px_rgba(0,0,0,0.9)]"
 			use:enhance={() => {
 				submitting = true;
 				return async ({ update }) => {

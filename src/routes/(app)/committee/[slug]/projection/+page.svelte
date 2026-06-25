@@ -220,7 +220,7 @@
 			<div class="mt-10 grid w-full max-w-6xl grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
 				{#each board as entry (entry.country + entry.name)}
 					<div
-						class="flex flex-col items-center justify-center rounded-md border px-2 py-3 {placardClass(entry.choice)} {reduceMotion ? '' : 'transition-colors duration-300'}"
+						class="flex flex-col items-center justify-center rounded-md border px-2 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_3px_6px_-1px_rgba(0,0,0,0.5)] {placardClass(entry.choice)} {reduceMotion ? '' : 'transition-colors duration-300'}"
 						title={entry.name}
 					>
 						<span class="label text-[0.65rem] leading-tight">{entry.country || entry.name}</span>
