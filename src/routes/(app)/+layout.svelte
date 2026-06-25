@@ -19,10 +19,10 @@
 		</a>
 
 		<div class="flex items-center gap-4">
-			<div class="text-right">
+			<a href="/me" class="rounded-lg px-2 py-1 text-right transition-colors hover:bg-white/5">
 				<p class="text-sm leading-tight font-medium text-ink-100">{data.delegate.fullName}</p>
 				<p class="text-xs leading-tight text-ink-400">{affiliation}</p>
-			</div>
+			</a>
 			<form method="POST" action="/logout">
 				<button type="submit" class="btn btn-ghost focus-ring px-3 py-1.5 text-xs">Sign out</button>
 			</form>

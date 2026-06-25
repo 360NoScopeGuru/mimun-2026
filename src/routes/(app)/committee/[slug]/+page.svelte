@@ -150,6 +150,7 @@
 			<h1 class="display mt-0.5 truncate text-lg text-ink-50">{data.committee.name}</h1>
 		</div>
 		<div class="flex items-center gap-4">
+			<a href="/committee/{data.committee.slug}/lobbying" class="hidden text-xs text-ink-400 transition-colors hover:text-brass-300 sm:block">Lobbying</a>
 			<a href="/committee/{data.committee.slug}/documents" class="hidden text-xs text-ink-400 transition-colors hover:text-brass-300 sm:block">Documents</a>
 			{#if isChair}<a href="/committee/{data.committee.slug}/participation" class="hidden text-xs text-ink-400 transition-colors hover:text-brass-300 sm:block">Participation</a>{/if}
 			{#if floor.mode === 'moderated_caucus' || floor.mode === 'unmoderated_caucus'}
