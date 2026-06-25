@@ -175,9 +175,9 @@
 
 <svelte:head><title>{data.committee.name} — MIMUN 2026</title></svelte:head>
 
-<div class="flex h-[calc(100vh-57px)] flex-col">
+<div class="flex min-h-[calc(100vh-57px)] flex-col lg:h-[calc(100vh-57px)]">
 	<!-- Floor bar -->
-	<div class="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-white/[0.07] px-6 py-3">
+	<div class="flex shrink-0 flex-wrap items-center justify-between gap-x-5 gap-y-2 border-b border-white/[0.07] px-5 py-3.5 sm:px-6">
 		<div class="min-w-0">
 			<div class="flex items-center gap-2">
 				<p class="label label-brass">{modeLabel[floor.mode] ?? floor.mode}</p>
@@ -186,12 +186,12 @@
 					<span class="h-1.5 w-1.5 rounded-full {statusDot[cstatus]}"></span>{statusLabel[cstatus]}
 				</span>
 			</div>
-			<h1 class="display mt-0.5 truncate text-lg text-ink-50">{data.committee.name}</h1>
+			<h1 class="display mt-0.5 truncate text-xl text-ink-50">{data.committee.name}</h1>
 		</div>
 		<div class="flex items-center gap-4">
-			<a href="/committee/{data.committee.slug}/lobbying" class="hidden text-xs text-ink-400 transition-colors hover:text-brass-300 sm:block">Lobbying</a>
-			<a href="/committee/{data.committee.slug}/documents" class="hidden text-xs text-ink-400 transition-colors hover:text-brass-300 sm:block">Documents</a>
-			{#if isChair}<a href="/committee/{data.committee.slug}/participation" class="hidden text-xs text-ink-400 transition-colors hover:text-brass-300 sm:block">Participation</a>{/if}
+			<a href="/committee/{data.committee.slug}/lobbying" class="hidden text-xs text-ink-400 transition-colors hover:text-brass-300 md:block">Lobbying</a>
+			<a href="/committee/{data.committee.slug}/documents" class="hidden text-xs text-ink-400 transition-colors hover:text-brass-300 md:block">Documents</a>
+			{#if isChair}<a href="/committee/{data.committee.slug}/participation" class="hidden text-xs text-ink-400 transition-colors hover:text-brass-300 md:block">Participation</a>{/if}
 			{#if floor.mode === 'moderated_caucus' || floor.mode === 'unmoderated_caucus'}
 				<div class="rounded-lg border border-brass-600/30 bg-brass-500/[0.08] px-3 py-1.5 shadow-[inset_0_-1px_3px_rgba(0,0,0,0.4)]">
 					<Timer endsAt={floor.caucusTimerEndsAt} label="Caucus" />
@@ -199,19 +199,19 @@
 				</div>
 			{/if}
 			<div class="text-right">
-				<p class="label text-[0.6rem]">Quorum</p>
+				<p class="label text-[0.65rem]">Quorum</p>
 				<p class="font-mono text-sm tabular-nums {att.hasQuorum ? 'text-signal-green' : 'text-ink-300'}">
 					{att.present}/{att.total}
-					<span class="text-[0.65rem] text-ink-500">{att.hasQuorum ? 'met' : `need ${att.quorumThreshold}`}</span>
+					<span class="text-[0.7rem] text-ink-500">{att.hasQuorum ? 'met' : `need ${att.quorumThreshold}`}</span>
 				</p>
 			</div>
 		</div>
 	</div>
 
-	<div class="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[1fr_400px]">
+	<div class="grid flex-1 grid-cols-1 lg:min-h-0 lg:grid-cols-[1fr_400px]">
 		<!-- Chamber floor: chat -->
-		<section class="flex min-w-0 flex-col border-r border-white/[0.07]">
-			<div bind:this={scrollEl} class="flex-1 space-y-5 overflow-y-auto px-6 py-6">
+		<section class="flex min-h-0 flex-col lg:border-r lg:border-white/[0.07]">
+			<div bind:this={scrollEl} class="flex-1 space-y-5 overflow-y-auto px-5 py-6 max-lg:max-h-[52vh] sm:px-6">
 				{#each messages as message (message.id)}
 					<div class="flex gap-3" class:opacity-50={message.pending}>
 						<div class="emblem mt-0.5 h-8 w-8 shrink-0 rounded-full text-xs">{message.author.slice(0, 1)}</div>
@@ -234,7 +234,7 @@
 			<form
 				method="POST"
 				action="?/sendMessage"
-				class="border-t border-white/[0.07] px-6 py-4"
+				class="border-t border-white/[0.07] px-5 py-4 sm:px-6"
 				use:enhance={() => {
 					const body = messageInput.trim();
 					const tempId = `temp-${crypto.randomUUID?.() ?? Date.now() + Math.random()}`;
@@ -264,10 +264,10 @@
 		</section>
 
 		<!-- The dais -->
-		<aside class="flex flex-col overflow-y-auto bg-ink-950/30">
+		<aside class="flex flex-col gap-3 bg-ink-950/30 p-3 sm:p-4 lg:overflow-y-auto">
 			<!-- Roll call (delegate sets own presence) -->
 			{#if floor.mode === 'roll_call'}
-				<div class="border-b border-white/[0.07] px-5 py-4">
+				<div class="card p-4">
 					<p class="label label-brass mb-3">Roll call</p>
 					{#if isChair}
 						<p class="text-sm text-ink-300">{att.present} present · {att.voting} voting · {att.total} members</p>
@@ -277,7 +277,7 @@
 							{#each [['present', 'Present'], ['present_and_voting', 'Present & voting']] as [value, text] (value)}
 								<form method="POST" action="?/setAttendance" use:enhance={refresh}>
 									<input type="hidden" name="status" {value} />
-									<button class="btn focus-ring w-full py-2 text-xs {att.mine === value ? 'btn-brass' : 'btn-ghost'}">{text}</button>
+									<button class="btn focus-ring w-full py-2.5 text-sm {att.mine === value ? 'btn-brass' : 'btn-ghost'}">{text}</button>
 								</form>
 							{/each}
 						</div>
@@ -285,40 +285,40 @@
 				</div>
 			{/if}
 
-			<!-- Open vote -->
+			<!-- Open vote — the live-action surface -->
 			{#if vote}
-				<div class="border-b border-white/[0.07] px-5 py-4">
-					<div class="mb-1 flex items-center justify-between">
+				<div class="card-live p-4">
+					<div class="mb-1.5 flex items-center justify-between">
 						<p class="label label-brass">Vote in progress</p>
-						<span class="label text-[0.6rem] text-ink-500">
+						<span class="label text-[0.65rem] text-ink-500">
 							{vote.method === 'roll_call' ? 'Roll call' : 'Placard'}{vote.round > 1 ? ` · Round ${vote.round}` : ''} · {vote.majorityRule === 'two_thirds' ? '⅔' : 'simple'}
 						</span>
 					</div>
 					<p class="mb-3 text-sm text-ink-100">{vote.label}</p>
 
-					<div class="space-y-1.5">
+					<div class="space-y-2">
 						{#each [['for', 'For', 'bg-vote-for'], ['against', 'Against', 'bg-vote-against'], ['abstain', 'Abstain', 'bg-vote-abstain']] as [key, text, color] (key)}
-							<div class="flex items-center gap-2">
+							<div class="flex items-center gap-2.5">
 								<span class="w-16 text-xs text-ink-300">{text}</span>
-								<div class="h-2 flex-1 overflow-hidden rounded-full bg-black/30 shadow-[inset_0_1px_2px_rgba(0,0,0,0.6)]">
+								<div class="h-2.5 flex-1 overflow-hidden rounded-full bg-black/30 shadow-[inset_0_1px_2px_rgba(0,0,0,0.6)]">
 									<div class="{color} h-full rounded-full shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]" style="width: {tallyBase + vote.tally.abstain > 0 ? (vote.tally[key as 'for'] / (tallyBase + vote.tally.abstain)) * 100 : 0}%"></div>
 								</div>
-								<span class="w-6 text-right font-mono text-xs tabular-nums text-ink-200">{vote.tally[key as 'for']}</span>
+								<span class="w-6 text-right font-mono text-sm tabular-nums text-ink-100">{vote.tally[key as 'for']}</span>
 							</div>
 						{/each}
 						{#if vote.tally.pass > 0}
-							<p class="text-[0.7rem] text-signal-amber">{vote.tally.pass} passing — must vote next round</p>
+							<p class="text-[0.72rem] text-signal-amber">{vote.tally.pass} passing — must vote next round</p>
 						{/if}
 					</div>
 
 					{#if !isChair}
 						{#if canVote}
-							<div class="mt-3 grid {voteChoices.length === 4 ? 'grid-cols-4' : 'grid-cols-3'} gap-1.5">
+							<div class="mt-4 grid {voteChoices.length === 4 ? 'grid-cols-4' : 'grid-cols-3'} gap-2">
 								{#each voteChoices as [choice, text] (choice)}
 									<form method="POST" action="?/castBallot" use:enhance={refresh}>
 										<input type="hidden" name="voteId" value={vote.id} />
 										<input type="hidden" name="choice" value={choice} />
-										<button class="btn focus-ring w-full py-2 text-xs {vote.myChoice === choice ? 'btn-brass' : 'btn-ghost'}">{text}</button>
+										<button class="btn focus-ring w-full py-3 text-sm {vote.myChoice === choice ? 'btn-brass' : 'btn-ghost'}">{text}</button>
 									</form>
 								{/each}
 							</div>
@@ -326,30 +326,30 @@
 							<p class="mt-3 text-xs text-ink-500">{vote.kind === 'substantive' ? 'Only present-and-voting delegations may vote.' : 'You must be present to vote.'}</p>
 						{/if}
 					{:else}
-						<div class="mt-3 flex gap-2">
+						<div class="mt-4 flex gap-2">
 							{#if vote.method === 'roll_call' && vote.tally.pass > 0}
 								<form method="POST" action="?/advanceRound" use:enhance={refresh} class="flex-1">
 									<input type="hidden" name="voteId" value={vote.id} />
-									<button class="btn btn-ghost focus-ring w-full py-2 text-xs">Second round</button>
+									<button class="btn btn-ghost focus-ring w-full py-2.5 text-sm">Second round</button>
 								</form>
 							{/if}
 							<form method="POST" action="?/closeVote" use:enhance={refresh} class="flex-1">
 								<input type="hidden" name="voteId" value={vote.id} />
-								<button class="btn btn-brass focus-ring w-full py-2 text-xs">Close &amp; announce</button>
+								<button class="btn btn-brass focus-ring w-full py-2.5 text-sm">Close &amp; announce</button>
 							</form>
 						</div>
 					{/if}
 				</div>
 			{/if}
 
-			<!-- Speaking now + speaker's list -->
-			<div class="border-b border-white/[0.07] px-5 py-4">
+			<!-- Speaking now -->
+			<div class="card p-4">
 				<p class="label label-brass">Speaking now</p>
 				{#if floor.currentSpeaker}
 					<div class="placard mt-3 flex items-center justify-between gap-3">
 						<div class="min-w-0">
-							<p class="truncate text-sm font-semibold text-ink-50 [text-shadow:0_1px_0_rgba(0,0,0,0.55)]">{floor.currentSpeaker.name}</p>
-							{#if floor.currentSpeaker.country}<p class="label text-[0.625rem] text-ink-400">{floor.currentSpeaker.country}</p>{/if}
+							<p class="truncate text-base font-semibold text-ink-50 [text-shadow:0_1px_0_rgba(0,0,0,0.55)]">{floor.currentSpeaker.name}</p>
+							{#if floor.currentSpeaker.country}<p class="label text-[0.65rem] text-ink-400">{floor.currentSpeaker.country}</p>{/if}
 						</div>
 						<Timer endsAt={floor.speakerTimerEndsAt} />
 					</div>
@@ -358,7 +358,8 @@
 				{/if}
 			</div>
 
-			<div class="border-b border-white/[0.07] px-5 py-4">
+			<!-- Speaker's list -->
+			<div class="card p-4">
 				<div class="mb-3 flex items-center justify-between">
 					<p class="label">Speaker's list</p>
 					<span class="font-mono text-xs text-ink-500">{queue.length} waiting</span>
@@ -383,173 +384,170 @@
 				{/if}
 			</div>
 
-			<!-- Motions & points on the floor -->
-			<div class="border-b border-white/[0.07] px-5 py-4">
-				<p class="label label-brass mb-3">On the floor</p>
+			<!-- Motions & points on the floor (only when something is pending) -->
+			{#if pendingMotions.length || points.length}
+				<div class="card p-4">
+					<p class="label label-brass mb-3">On the floor</p>
 
-				{#if pendingMotions.length}
-					<ul class="space-y-2">
-						{#each pendingMotions as m (m.id)}
-							<li class="rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
-								<p class="text-sm text-ink-100">{m.label}</p>
-								<p class="text-xs text-ink-500">
-									{m.proposerCountry || m.proposer}{#if num(m.params.totalSeconds)} · {Math.round(num(m.params.totalSeconds)! / 60)} min{/if}{#if str(m.params.topic)} · {str(m.params.topic)}{/if}
-								</p>
-								{#if isChair}
-									<div class="mt-2 flex gap-1.5">
-										<form method="POST" action="?/entertainMotion" use:enhance={refresh}><input type="hidden" name="motionId" value={m.id} /><button class="btn btn-brass focus-ring px-2 py-1 text-[0.65rem]">Put to vote</button></form>
-										<form method="POST" action="?/adoptMotion" use:enhance={refresh}><input type="hidden" name="motionId" value={m.id} /><button class="btn btn-ghost focus-ring px-2 py-1 text-[0.65rem]">Adopt</button></form>
-										<form method="POST" action="?/ruleMotion" use:enhance={refresh}><input type="hidden" name="motionId" value={m.id} /><button class="btn btn-quiet focus-ring px-2 py-1 text-[0.65rem]">Dismiss</button></form>
-									</div>
-								{/if}
-							</li>
-						{/each}
-					</ul>
-				{:else}
-					<p class="text-sm text-ink-500">No motions pending.</p>
-				{/if}
+					{#if pendingMotions.length}
+						<ul class="space-y-2">
+							{#each pendingMotions as m (m.id)}
+								<li class="rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
+									<p class="text-sm text-ink-100">{m.label}</p>
+									<p class="text-xs text-ink-500">
+										{m.proposerCountry || m.proposer}{#if num(m.params.totalSeconds)} · {Math.round(num(m.params.totalSeconds)! / 60)} min{/if}{#if str(m.params.topic)} · {str(m.params.topic)}{/if}
+									</p>
+									{#if isChair}
+										<div class="mt-2 flex flex-wrap gap-2">
+											<form method="POST" action="?/entertainMotion" use:enhance={refresh}><input type="hidden" name="motionId" value={m.id} /><button class="btn btn-brass focus-ring px-3 py-1.5 text-xs">Put to vote</button></form>
+											<form method="POST" action="?/adoptMotion" use:enhance={refresh}><input type="hidden" name="motionId" value={m.id} /><button class="btn btn-ghost focus-ring px-3 py-1.5 text-xs">Adopt</button></form>
+											<form method="POST" action="?/ruleMotion" use:enhance={refresh}><input type="hidden" name="motionId" value={m.id} /><button class="btn btn-quiet focus-ring px-3 py-1.5 text-xs">Dismiss</button></form>
+										</div>
+									{/if}
+								</li>
+							{/each}
+						</ul>
+					{/if}
 
-				{#if points.length}
-					<div class="mt-3 space-y-1 border-t border-white/[0.06] pt-3">
-						{#each points as p (p.id)}
-							<p class="text-xs text-ink-400"><span class="text-brass-400">{pointLabel[p.type]}</span> — {p.byCountry || p.by}{#if p.body}: {p.body}{/if}</p>
-						{/each}
-					</div>
-				{/if}
+					{#if points.length}
+						<div class="mt-3 space-y-1 {pendingMotions.length ? 'border-t border-white/[0.06] pt-3' : ''}">
+							{#each points as p (p.id)}
+								<p class="text-xs text-ink-400"><span class="text-brass-400">{pointLabel[p.type]}</span> — {p.byCountry || p.by}{#if p.body}: {p.body}{/if}</p>
+							{/each}
+						</div>
+					{/if}
+				</div>
+			{/if}
 
-				{#if !isChair}
-					<details class="mt-3">
-						<summary class="cursor-pointer text-xs text-brass-400">Raise a motion or point</summary>
-						<form method="POST" action="?/raiseMotion" use:enhance={refresh} class="mt-2 rounded-lg border border-white/[0.07] p-3">
-							<select name="type" class="input py-1.5 text-xs">
-								{#each motionOptions as [v, t] (v)}<option value={v}>{t}</option>{/each}
-							</select>
-							<div class="mt-2 flex gap-2">
-								<input name="totalSeconds" type="number" min="30" max="3600" value="600" class="input w-20 py-1.5 text-xs" title="Seconds" />
-								<input name="topic" placeholder="Topic (optional)" class="input flex-1 py-1.5 text-xs" />
-							</div>
-							{#if resolution}<input type="hidden" name="targetResolutionId" value={resolution.id} />{/if}
-							<button class="btn btn-ghost focus-ring mt-2 w-full py-1.5 text-xs">Raise motion</button>
-						</form>
-						<form method="POST" action="?/raisePoint" use:enhance={refresh} class="mt-2 rounded-lg border border-white/[0.07] p-3">
-							<select name="type" class="input py-1.5 text-xs">
-								{#each pointOptions as [v, t] (v)}<option value={v}>{t}</option>{/each}
-							</select>
-							<input name="body" placeholder="Detail (optional)" class="input mt-2 py-1.5 text-xs" />
-							<button class="btn btn-ghost focus-ring mt-2 w-full py-1.5 text-xs">Raise point</button>
-						</form>
-					</details>
-				{/if}
-			</div>
+			<!-- Tools: raise a motion or point (delegate) -->
+			{#if !isChair}
+				<details class="card p-4">
+					<summary class="label label-brass cursor-pointer select-none">Raise a motion or point</summary>
+					<form method="POST" action="?/raiseMotion" use:enhance={refresh} class="mt-3 rounded-lg border border-white/[0.07] p-3">
+						<select name="type" class="input py-2 text-sm">
+							{#each motionOptions as [v, t] (v)}<option value={v}>{t}</option>{/each}
+						</select>
+						<div class="mt-2 flex gap-2">
+							<input name="totalSeconds" type="number" min="30" max="3600" value="600" class="input w-24 py-2 text-sm" title="Seconds" />
+							<input name="topic" placeholder="Topic (optional)" class="input flex-1 py-2 text-sm" />
+						</div>
+						{#if resolution}<input type="hidden" name="targetResolutionId" value={resolution.id} />{/if}
+						<button class="btn btn-ghost focus-ring mt-2 w-full py-2 text-sm">Raise motion</button>
+					</form>
+					<form method="POST" action="?/raisePoint" use:enhance={refresh} class="mt-2 rounded-lg border border-white/[0.07] p-3">
+						<select name="type" class="input py-2 text-sm">
+							{#each pointOptions as [v, t] (v)}<option value={v}>{t}</option>{/each}
+						</select>
+						<input name="body" placeholder="Detail (optional)" class="input mt-2 py-2 text-sm" />
+						<button class="btn btn-ghost focus-ring mt-2 w-full py-2 text-sm">Raise point</button>
+					</form>
+				</details>
+			{/if}
 
 			<!-- Notes (private diplomacy) -->
-			<div class="border-b border-white/[0.07] px-5 py-4">
-				<details ontoggle={(e) => { if ((e.currentTarget as HTMLDetailsElement).open) markNotesRead(); }}>
-					<summary class="flex cursor-pointer items-center justify-between">
-						<span class="label label-brass">Notes{isChair ? ' · moderation' : ''}</span>
-						{#if unreadNotes > 0}<span class="rounded-full bg-brass-500 px-1.5 py-0.5 text-[0.6rem] font-semibold text-ink-950">{unreadNotes}</span>{/if}
-					</summary>
+			<details class="card p-4" ontoggle={(e) => { if ((e.currentTarget as HTMLDetailsElement).open) markNotesRead(); }}>
+				<summary class="flex cursor-pointer select-none items-center justify-between">
+					<span class="label label-brass">Notes{isChair ? ' · moderation' : ''}</span>
+					{#if unreadNotes > 0}<span class="rounded-full bg-brass-500 px-2 py-0.5 text-[0.65rem] font-semibold text-ink-950">{unreadNotes}</span>{/if}
+				</summary>
 
-					<form
-						method="POST"
-						action="?/sendNote"
-						class="mt-3 flex flex-col gap-2"
-						use:enhance={() => {
-							const sent = noteBody;
-							noteBody = '';
-							return async ({ result }) => {
-								if (result.type === 'failure' || result.type === 'error') noteBody = sent;
-								await poll();
-							};
-						}}
-					>
-						<select name="toId" bind:value={noteTo} class="input py-1.5 text-xs">
-							<option value="dais">The dais</option>
-							{#each recipients as m (m.id)}<option value={m.id}>{m.country || m.name}</option>{/each}
-						</select>
-						<div class="flex gap-2">
-							<input name="body" bind:value={noteBody} placeholder="Private note…" autocomplete="off" maxlength="500" class="input flex-1 py-1.5 text-xs" />
-							<button type="submit" disabled={!noteBody.trim()} class="btn btn-brass focus-ring px-3 py-1.5 text-xs">Pass</button>
-						</div>
-					</form>
-
-					<div class="mt-3 max-h-56 space-y-1.5 overflow-y-auto">
-						{#each notes as n (n.id)}
-							<div class="rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2">
-								<p class="label text-[0.55rem] text-ink-500">
-									{#if n.fromId === me.id}You → {n.toName ? (n.toCountry || n.toName) : 'The dais'}
-									{:else}{n.fromCountry || n.fromName} → {n.toName ? (n.toCountry || n.toName) : 'The dais'}{/if}
-								</p>
-								<p class="mt-0.5 text-sm text-ink-200">{n.body}</p>
-							</div>
-						{:else}
-							<p class="text-xs text-ink-500">No notes yet — pass a private note to another delegation.</p>
-						{/each}
+				<form
+					method="POST"
+					action="?/sendNote"
+					class="mt-3 flex flex-col gap-2"
+					use:enhance={() => {
+						const sent = noteBody;
+						noteBody = '';
+						return async ({ result }) => {
+							if (result.type === 'failure' || result.type === 'error') noteBody = sent;
+							await poll();
+						};
+					}}
+				>
+					<select name="toId" bind:value={noteTo} class="input py-2 text-sm">
+						<option value="dais">The dais</option>
+						{#each recipients as m (m.id)}<option value={m.id}>{m.country || m.name}</option>{/each}
+					</select>
+					<div class="flex gap-2">
+						<input name="body" bind:value={noteBody} placeholder="Private note…" autocomplete="off" maxlength="500" class="input flex-1 py-2 text-sm" />
+						<button type="submit" disabled={!noteBody.trim()} class="btn btn-brass focus-ring px-3 py-2 text-sm">Pass</button>
 					</div>
-				</details>
-			</div>
+				</form>
+
+				<div class="mt-3 max-h-56 space-y-1.5 overflow-y-auto">
+					{#each notes as n (n.id)}
+						<div class="rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2">
+							<p class="label text-[0.6rem] text-ink-500">
+								{#if n.fromId === me.id}You → {n.toName ? (n.toCountry || n.toName) : 'The dais'}
+								{:else}{n.fromCountry || n.fromName} → {n.toName ? (n.toCountry || n.toName) : 'The dais'}{/if}
+							</p>
+							<p class="mt-0.5 text-sm text-ink-200">{n.body}</p>
+						</div>
+					{:else}
+						<p class="text-xs text-ink-500">No notes yet — pass a private note to another delegation.</p>
+					{/each}
+				</div>
+			</details>
 
 			<!-- AI parliamentarian -->
 			{#if data.aiConfigured}
-				<div class="border-b border-white/[0.07] px-5 py-4">
-					<details>
-						<summary class="flex cursor-pointer items-center justify-between">
-							<span class="label label-brass">Parliamentarian</span>
-							<span class="label text-[0.55rem] text-ink-600">AI</span>
-						</summary>
-						<p class="mt-2 text-xs text-ink-500">
-							Ask about the rules of procedure — quorum, majorities, motions, amendments.
-						</p>
-						<form
-							class="mt-3 flex gap-2"
-							onsubmit={(e) => {
-								e.preventDefault();
-								submitAsk();
-							}}
-						>
-							<input
-								bind:value={askQ}
-								placeholder="e.g. What majority adopts a resolution?"
-								maxlength="500"
-								class="input flex-1 py-1.5 text-xs"
-							/>
-							<button type="submit" disabled={!askQ.trim() || asking} class="btn btn-brass focus-ring px-3 py-1.5 text-xs">
-								{asking ? '…' : 'Ask'}
+				<details class="card p-4">
+					<summary class="flex cursor-pointer select-none items-center justify-between">
+						<span class="label label-brass">Parliamentarian</span>
+						<span class="label text-[0.6rem] text-ink-600">AI</span>
+					</summary>
+					<p class="mt-2 text-xs text-ink-500">
+						Ask about the rules of procedure — quorum, majorities, motions, amendments.
+					</p>
+					<form
+						class="mt-3 flex gap-2"
+						onsubmit={(e) => {
+							e.preventDefault();
+							submitAsk();
+						}}
+					>
+						<input
+							bind:value={askQ}
+							placeholder="e.g. What majority adopts a resolution?"
+							maxlength="500"
+							class="input flex-1 py-2 text-sm"
+						/>
+						<button type="submit" disabled={!askQ.trim() || asking} class="btn btn-brass focus-ring px-3 py-2 text-sm">
+							{asking ? '…' : 'Ask'}
+						</button>
+					</form>
+					<div class="mt-2 flex flex-wrap gap-1.5">
+						{#each askSuggestions as s (s)}
+							<button
+								type="button"
+								onclick={() => submitAsk(s)}
+								disabled={asking}
+								class="rounded-full border border-white/10 px-3 py-1.5 text-xs text-ink-400 transition-colors hover:border-brass-400/40 hover:text-brass-200 disabled:opacity-40"
+							>
+								{s}
 							</button>
-						</form>
-						<div class="mt-2 flex flex-wrap gap-1.5">
-							{#each askSuggestions as s (s)}
-								<button
-									type="button"
-									onclick={() => submitAsk(s)}
-									disabled={asking}
-									class="rounded-full border border-white/10 px-2 py-1 text-[0.65rem] text-ink-400 transition-colors hover:border-brass-400/40 hover:text-brass-200 disabled:opacity-40"
-								>
-									{s}
-								</button>
-							{/each}
+						{/each}
+					</div>
+					{#if asking}
+						<p class="mt-3 text-xs text-ink-500">Consulting the rules…</p>
+					{:else if askError}
+						<p class="mt-3 text-xs text-signal-amber">{askError}</p>
+					{:else if askAnswer}
+						<div class="mt-3 rounded-lg border border-brass-400/20 bg-brass-400/[0.04] px-3 py-2.5">
+							<p class="whitespace-pre-wrap text-sm leading-relaxed text-ink-100">{askAnswer}</p>
+							{#if askProvider}<p class="label mt-2 text-[0.6rem] text-ink-600">via {askProvider}</p>{/if}
 						</div>
-						{#if asking}
-							<p class="mt-3 text-xs text-ink-500">Consulting the rules…</p>
-						{:else if askError}
-							<p class="mt-3 text-xs text-signal-amber">{askError}</p>
-						{:else if askAnswer}
-							<div class="mt-3 rounded-lg border border-brass-400/20 bg-brass-400/[0.04] px-3 py-2.5">
-								<p class="whitespace-pre-wrap text-sm leading-relaxed text-ink-100">{askAnswer}</p>
-								{#if askProvider}<p class="label mt-2 text-[0.55rem] text-ink-600">via {askProvider}</p>{/if}
-							</div>
-						{/if}
-					</details>
-				</div>
+					{/if}
+				</details>
 			{/if}
 
 			<!-- Resolution on the table -->
 			{#if resolution}
-				<a href="/committee/{data.committee.slug}/resolutions" class="block border-b border-white/[0.07] px-5 py-4 transition-colors hover:bg-white/[0.02]">
+				<a href="/committee/{data.committee.slug}/resolutions" class="card block p-4 transition-colors hover:border-brass-600/30">
 					<p class="label label-brass mb-2">Resolution</p>
 					<div class="flex items-center gap-2">
 						{#if resolution.designation}<span class="rounded border border-brass-600/40 px-1.5 py-0.5 font-mono text-[0.65rem] text-brass-300">{resolution.designation}</span>{/if}
-						<span class="text-[0.625rem] text-ink-500 uppercase">{resolution.status}</span>
+						<span class="text-[0.65rem] text-ink-500 uppercase">{resolution.status}</span>
 					</div>
 					<p class="mt-1.5 text-sm leading-snug text-ink-200">{resolution.title}</p>
 					<p class="mt-1 text-xs text-brass-400">Open in the drafting room →</p>
@@ -558,73 +556,73 @@
 
 			<!-- Chair console -->
 			{#if isChair}
-				<div class="px-5 py-4">
-					<p class="label label-brass mb-3">Chair controls</p>
+				<details open class="card p-4">
+					<summary class="label label-brass cursor-pointer select-none">Chair console</summary>
 
-					<div class="space-y-3">
+					<div class="mt-3 space-y-3">
 						<!-- Roll call -->
 						{#if floor.mode === 'roll_call'}
 							<form method="POST" action="?/closeRollCall" use:enhance={refresh}>
-								<button class="btn btn-ghost focus-ring w-full py-2 text-xs">Close roll call</button>
+								<button class="btn btn-ghost focus-ring w-full py-2.5 text-sm">Close roll call</button>
 							</form>
 						{:else}
 							<form method="POST" action="?/openRollCall" use:enhance={refresh}>
-								<button class="btn btn-ghost focus-ring w-full py-2 text-xs">Take roll call</button>
+								<button class="btn btn-ghost focus-ring w-full py-2.5 text-sm">Take roll call</button>
 							</form>
 						{/if}
 
 						<!-- Speaker -->
 						<form method="POST" action="?/callNext" use:enhance={refresh}>
-							<button disabled={queue.length === 0} class="btn btn-brass focus-ring w-full py-2 text-xs">Recognize next speaker</button>
+							<button disabled={queue.length === 0} class="btn btn-brass focus-ring w-full py-2.5 text-sm">Recognize next speaker</button>
 						</form>
 
 						<!-- Caucus -->
 						{#if floor.mode === 'moderated_caucus' || floor.mode === 'unmoderated_caucus'}
 							<form method="POST" action="?/endCaucus" use:enhance={refresh}>
-								<button class="btn btn-ghost focus-ring w-full py-2 text-xs">End caucus</button>
+								<button class="btn btn-ghost focus-ring w-full py-2.5 text-sm">End caucus</button>
 							</form>
 						{:else}
 							<form method="POST" action="?/startCaucus" use:enhance={refresh} class="rounded-lg border border-white/[0.07] p-3">
-								<p class="label mb-2 text-[0.6rem]">Start caucus</p>
+								<p class="label mb-2 text-[0.65rem]">Start caucus</p>
 								<div class="flex gap-2">
-									<select name="type" class="input flex-1 py-1.5 text-xs">
+									<select name="type" class="input flex-1 py-2 text-sm">
 										<option value="moderated_caucus">Moderated</option>
 										<option value="unmoderated_caucus">Unmoderated</option>
 									</select>
-									<input name="totalSeconds" type="number" min="30" max="3600" value="600" class="input w-20 py-1.5 text-xs" title="Total seconds" />
+									<input name="totalSeconds" type="number" min="30" max="3600" value="600" class="input w-24 py-2 text-sm" title="Total seconds" />
 								</div>
-								<input name="topic" placeholder="Topic (optional)" class="input mt-2 py-1.5 text-xs" />
-								<button class="btn btn-brass focus-ring mt-2 w-full py-2 text-xs">Start</button>
+								<input name="topic" placeholder="Topic (optional)" class="input mt-2 py-2 text-sm" />
+								<button class="btn btn-brass focus-ring mt-2 w-full py-2.5 text-sm">Start</button>
 							</form>
 						{/if}
 
 						<!-- Vote -->
 						{#if !vote}
 							<form method="POST" action="?/openVote" use:enhance={refresh} class="rounded-lg border border-white/[0.07] p-3">
-								<p class="label mb-2 text-[0.6rem]">Open a vote</p>
-								<input name="label" placeholder="Question put to the floor…" class="input py-1.5 text-xs" />
-								<select name="majorityRule" class="input mt-2 py-1.5 text-xs">
+								<p class="label mb-2 text-[0.65rem]">Open a vote</p>
+								<input name="label" placeholder="Question put to the floor…" class="input py-2 text-sm" />
+								<select name="majorityRule" class="input mt-2 py-2 text-sm">
 									<option value="simple">Simple majority</option>
 									<option value="two_thirds">Two-thirds majority</option>
 								</select>
-								<button class="btn btn-brass focus-ring mt-2 w-full py-2 text-xs">Open vote</button>
+								<button class="btn btn-brass focus-ring mt-2 w-full py-2.5 text-sm">Open vote</button>
 							</form>
 						{/if}
 
 						<!-- Session status -->
 						<div>
-							<p class="label mt-1 mb-2 text-[0.6rem]">Session</p>
+							<p class="label mt-1 mb-2 text-[0.65rem]">Session</p>
 							<div class="grid grid-cols-3 gap-2">
 								{#each [['in_session', 'Open'], ['suspended', 'Suspend'], ['closed', 'Close']] as [value, text] (value)}
 									<form method="POST" action="?/setStatus" use:enhance={refresh}>
 										<input type="hidden" name="status" {value} />
-										<button class="btn focus-ring w-full py-2 text-xs {cstatus === value ? 'btn-ghost border-brass-600/50 text-brass-300' : 'btn-quiet'}">{text}</button>
+										<button class="btn focus-ring w-full py-2.5 text-sm {cstatus === value ? 'btn-ghost border-brass-600/50 text-brass-300' : 'btn-quiet'}">{text}</button>
 									</form>
 								{/each}
 							</div>
 						</div>
 					</div>
-				</div>
+				</details>
 			{/if}
 		</aside>
 	</div>
