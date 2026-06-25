@@ -6,6 +6,7 @@ import { resolutions, resolutionClauses, resolutionSponsors, amendments, delegat
 import { loadCommittee, assertMember, isChair } from '$lib/server/auth/guards';
 import { applyAmendment, openSubstantiveVote } from '$lib/server/floor';
 import { isAiConfigured } from '$lib/server/ai';
+import { audit } from '$lib/server/audit';
 
 export const load: PageServerLoad = async ({ params, locals, url }) => {
 	const committee = await loadCommittee(params.slug);
@@ -129,6 +130,7 @@ export const actions: Actions = {
 		}
 
 		await db.update(resolutions).set({ status: 'approved', approvedAt: new Date(), designation }).where(eq(resolutions.id, r.id));
+		await audit(committee, delegate.id, 'approve_resolution', { resolutionId: r.id, designation });
 		return { success: true };
 	},
 
@@ -139,6 +141,7 @@ export const actions: Actions = {
 
 		const id = String((await request.formData()).get('resolutionId') ?? '');
 		await db.update(resolutions).set({ status: 'lobbying' }).where(and(eq(resolutions.id, id), eq(resolutions.committeeId, committee.id), eq(resolutions.status, 'submitted')));
+		await audit(committee, delegate.id, 'return_resolution', { resolutionId: id });
 		return { success: true };
 	},
 
@@ -159,6 +162,13 @@ export const actions: Actions = {
 
 		const [r] = await db.select().from(resolutions).where(and(eq(resolutions.id, resolutionId), eq(resolutions.committeeId, committee.id)));
 		if (!r) return fail(404);
+
+		// A targeted clause must belong to this resolution — otherwise a crafted
+		// targetClauseId could strike/amend another resolution's clause on pass.
+		if (targetClauseId) {
+			const [c] = await db.select({ id: resolutionClauses.id }).from(resolutionClauses).where(and(eq(resolutionClauses.id, targetClauseId), eq(resolutionClauses.resolutionId, r.id)));
+			if (!c) return fail(400, { message: 'That clause is not part of this resolution' });
+		}
 
 		await db.insert(amendments).values({ resolutionId: r.id, targetClauseId, type: type as 'friendly', action: action as 'add', text, proposedById: delegate.id, status: 'proposed' });
 		return { success: true };
@@ -181,8 +191,11 @@ export const actions: Actions = {
 		if (amendment.status !== 'proposed') return fail(400);
 		if (!isChair(delegate) && resolution.mainSubmitterId !== delegate.id) return fail(403, { message: 'Only the main submitter may accept' });
 
-		await db.update(amendments).set({ status: 'passed' }).where(eq(amendments.id, amendment.id));
-		await applyAmendment(amendment);
+		await db.transaction(async (tx) => {
+			await tx.update(amendments).set({ status: 'passed' }).where(eq(amendments.id, amendment.id));
+			await applyAmendment(amendment, tx);
+		});
+		await audit(committee, delegate.id, 'accept_amendment', { amendmentId: amendment.id, resolutionId: resolution.id });
 		return { success: true };
 	},
 
@@ -196,8 +209,11 @@ export const actions: Actions = {
 		const [a] = await db.select().from(amendments).where(eq(amendments.id, id));
 		if (!a || a.status !== 'proposed') return fail(400);
 
-		await db.update(amendments).set({ status: 'voting' }).where(eq(amendments.id, a.id));
-		await openSubstantiveVote(committee, 'amendment', a.id, 'Amendment to the resolution', 'roll_call');
+		await db.transaction(async (tx) => {
+			await tx.update(amendments).set({ status: 'voting' }).where(eq(amendments.id, a.id));
+			await openSubstantiveVote(committee, 'amendment', a.id, 'Amendment to the resolution', 'roll_call', tx);
+		});
+		await audit(committee, delegate.id, 'vote_amendment', { amendmentId: a.id });
 		return { success: true };
 	},
 
@@ -215,6 +231,7 @@ export const actions: Actions = {
 		if (!isChair(delegate) && a.resolutions.mainSubmitterId !== delegate.id) return fail(403);
 
 		await db.update(amendments).set({ status: 'withdrawn' }).where(eq(amendments.id, a.amendments.id));
+		await audit(committee, delegate.id, 'reject_amendment', { amendmentId: a.amendments.id });
 		return { success: true };
 	}
 };
