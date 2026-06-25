@@ -3,6 +3,7 @@ import type { RequestHandler } from './$types';
 import { loadCommittee, assertMember } from '$lib/server/auth/guards';
 import { reviewPositionPaper } from '$lib/server/aiFeatures';
 import { isAiConfigured, AiNotConfiguredError } from '$lib/server/ai';
+import { enforceRate, RATE_RULES } from '$lib/server/rateLimit';
 
 export const POST: RequestHandler = async ({ params, request, locals }) => {
 	const committee = await loadCommittee(params.slug);
@@ -13,6 +14,8 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 	const { text } = (await request.json().catch(() => ({}))) as { text?: string };
 	const draft = (text ?? '').trim();
 	if (draft.length < 80) error(400, 'Paste at least a paragraph of your position paper to get feedback.');
+
+	await enforceRate(`ai-review:${delegate.id}`, RATE_RULES.aiReview, 'Too many review requests — give it a minute.');
 
 	try {
 		const { data, provider } = await reviewPositionPaper({

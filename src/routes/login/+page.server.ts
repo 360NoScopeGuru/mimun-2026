@@ -1,6 +1,7 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { authenticateInviteCode, createSession, generateSessionToken, setSessionCookie } from '$lib/server/auth';
+import { rateLimit, RATE_RULES, retryAfterSeconds } from '$lib/server/rateLimit';
 import { db } from '$lib/server/db';
 import { committees } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
@@ -16,6 +17,12 @@ export const actions: Actions = {
 
 		if (!inviteCode.trim()) {
 			return fail(400, { message: 'Enter your invite code.' });
+		}
+
+		// Throttle invite-code guessing per client IP.
+		const rl = await rateLimit(`login:${event.getClientAddress()}`, RATE_RULES.login);
+		if (!rl.allowed) {
+			return fail(429, { message: `Too many sign-in attempts. Try again in ${retryAfterSeconds(rl)}s.` });
 		}
 
 		const delegate = await authenticateInviteCode(inviteCode);

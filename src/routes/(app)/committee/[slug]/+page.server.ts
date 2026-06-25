@@ -2,6 +2,7 @@ import { fail } from '@sveltejs/kit';
 import { and, eq, isNull } from 'drizzle-orm';
 import type { Actions, PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
+import { rateLimit, RATE_RULES } from '$lib/server/rateLimit';
 import {
 	committees,
 	delegates,
@@ -412,6 +413,9 @@ export const actions: Actions = {
 	sendNote: async ({ request, locals, params }) => {
 		const committee = await loadCommittee(params.slug);
 		const delegate = assertMember(locals.delegate, committee.id);
+
+		const rl = await rateLimit(`note:${delegate.id}`, RATE_RULES.note);
+		if (!rl.allowed) return fail(429, { message: 'Slow down — too many notes in a short time.' });
 
 		const form = await request.formData();
 		const toRaw = String(form.get('toId') ?? '');

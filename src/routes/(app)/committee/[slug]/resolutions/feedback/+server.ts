@@ -6,10 +6,11 @@ import { resolutions, resolutionClauses } from '$lib/server/db/schema';
 import { loadCommittee, assertMember } from '$lib/server/auth/guards';
 import { reviewResolution } from '$lib/server/aiFeatures';
 import { isAiConfigured, AiNotConfiguredError } from '$lib/server/ai';
+import { enforceRate, RATE_RULES } from '$lib/server/rateLimit';
 
 export const POST: RequestHandler = async ({ params, request, locals }) => {
 	const committee = await loadCommittee(params.slug);
-	assertMember(locals.delegate, committee.id);
+	const delegate = assertMember(locals.delegate, committee.id);
 
 	if (!isAiConfigured()) error(503, 'AI feedback is not configured yet.');
 
@@ -29,6 +30,8 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 		.orderBy(asc(resolutionClauses.position));
 
 	if (clauses.length === 0) error(400, 'Add some clauses before requesting feedback.');
+
+	await enforceRate(`ai-review:${delegate.id}`, RATE_RULES.aiReview, 'Too many review requests — give it a minute.');
 
 	try {
 		const { data, provider } = await reviewResolution({

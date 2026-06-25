@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, integer, uuid, jsonb, pgEnum, unique, customType } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, integer, bigint, uuid, jsonb, pgEnum, unique, customType } from 'drizzle-orm/pg-core';
 
 // Raw binary column for storing uploaded files (position papers, committee docs).
 const bytea = customType<{ data: Buffer; driverData: Buffer }>({
@@ -372,4 +372,17 @@ export const files = pgTable('files', {
 		.notNull()
 		.references(() => delegates.id),
 	createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+});
+
+/* ------------------------------------------------------------------ *
+ * Infrastructure
+ * ------------------------------------------------------------------ */
+
+// Fixed-window rate limiting: one row per limiter key, upserted atomically.
+// window_start is the epoch-ms start of the active window; count is the number
+// of requests seen in it. See lib/server/rateLimit.ts.
+export const rateLimits = pgTable('rate_limits', {
+	key: text('key').primaryKey(),
+	windowStart: bigint('window_start', { mode: 'number' }).notNull(),
+	count: integer('count').notNull().default(0)
 });

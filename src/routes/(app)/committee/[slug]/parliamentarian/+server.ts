@@ -7,6 +7,7 @@ import { loadCommittee, assertMember } from '$lib/server/auth/guards';
 import { presetFor } from '$lib/server/procedure';
 import { askParliamentarian } from '$lib/server/aiFeatures';
 import { isAiConfigured, AiNotConfiguredError } from '$lib/server/ai';
+import { enforceRate, RATE_RULES } from '$lib/server/rateLimit';
 
 const MODE_LABEL: Record<string, string> = {
 	closed: 'floor closed',
@@ -19,7 +20,7 @@ const MODE_LABEL: Record<string, string> = {
 
 export const POST: RequestHandler = async ({ params, request, locals }) => {
 	const committee = await loadCommittee(params.slug);
-	assertMember(locals.delegate, committee.id);
+	const delegate = assertMember(locals.delegate, committee.id);
 
 	if (!isAiConfigured()) error(503, 'The AI parliamentarian is not configured yet.');
 
@@ -27,6 +28,12 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 	const q = (question ?? '').trim();
 	if (!q) error(400, 'Ask a question about the rules of procedure.');
 	if (q.length > 500) error(400, 'Please keep the question under 500 characters.');
+
+	await enforceRate(
+		`ai-qa:${delegate.id}`,
+		RATE_RULES.aiQa,
+		'Too many questions in a row — give the parliamentarian a moment.'
+	);
 
 	const preset = presetFor((committee.rulesConfig as { preset?: string })?.preset);
 	const [floor] = await db.select().from(committeeFloor).where(eq(committeeFloor.committeeId, committee.id));
