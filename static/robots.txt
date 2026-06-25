@@ -1,3 +1,4 @@
-# allow crawling everything by default
+# MIMUN 2026 is an invite-only conference platform — keep it out of search
+# indexes. Shared links (e.g. the spectator feed) still work directly.
 User-agent: *
-Disallow:
+Disallow: /
