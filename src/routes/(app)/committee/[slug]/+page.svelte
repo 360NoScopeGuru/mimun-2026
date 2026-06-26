@@ -695,7 +695,7 @@
 					{:else if askError}
 						<p class="mt-3 text-xs text-signal-amber">{askError}</p>
 					{:else if askAnswer}
-						<div class="mt-3 rounded-lg border border-brass-400/20 bg-brass-400/[0.04] px-3 py-2.5">
+						<div in:rise class="mt-3 rounded-lg border border-brass-400/20 bg-brass-400/[0.04] px-3 py-2.5">
 							<p class="whitespace-pre-wrap text-sm leading-relaxed text-ink-100">{askAnswer}</p>
 							{#if askProvider}<p class="label mt-2 text-[0.6rem] text-ink-600">via {askProvider}</p>{/if}
 						</div>

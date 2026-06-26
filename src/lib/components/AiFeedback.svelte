@@ -13,7 +13,7 @@
 	const clamp = (n: number) => Math.max(0, Math.min(5, Math.round(n || 0)));
 </script>
 
-<div class="rounded-xl border border-paper-line bg-paper-100/60 p-4">
+<div class="fb-card rounded-xl border border-paper-line bg-paper-100/60 p-4">
 	<div class="flex items-center justify-between">
 		<p class="label text-paper-ink-500">Parliamentarian's review</p>
 		{#if provider}<span class="label text-[0.55rem] text-paper-ink-500">AI · {provider}</span>{/if}
@@ -23,7 +23,7 @@
 
 	<!-- Scores -->
 	<div class="mt-4 grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-4">
-		{#each SCORE_LABELS as s (s.key)}
+		{#each SCORE_LABELS as s, si (s.key)}
 			{@const v = clamp(feedback.scores?.[s.key])}
 			<div>
 				<div class="flex items-baseline justify-between">
@@ -33,8 +33,8 @@
 				<div class="mt-1 flex gap-0.5">
 					{#each Array(5) as _, i (i)}
 						<span
-							class="h-1.5 flex-1 rounded-full"
-							style="background-color: {i < v ? tone(v) : 'var(--color-paper-200)'}"
+							class="h-1.5 flex-1 rounded-full {i < v ? 'pip' : ''}"
+							style="background-color: {i < v ? tone(v) : 'var(--color-paper-200)'}; animation-delay: {si * 90 + i * 45}ms"
 						></span>
 					{/each}
 				</div>
@@ -70,3 +70,33 @@
 		</div>
 	{/if}
 </div>
+
+<style>
+	/* The review card eases in, then its score pips fill left-to-right in a stagger
+	   (animation-delay set inline per pip) — a scorecard being marked up. */
+	.fb-card {
+		animation: fb-rise 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+	}
+	.pip {
+		transform-origin: left center;
+		animation: pip-fill 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+	}
+	@keyframes fb-rise {
+		from {
+			transform: translateY(8px);
+			opacity: 0;
+		}
+	}
+	@keyframes pip-fill {
+		from {
+			transform: scaleX(0);
+			opacity: 0;
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.fb-card,
+		.pip {
+			animation: none;
+		}
+	}
+</style>

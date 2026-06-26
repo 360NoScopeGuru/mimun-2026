@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { enhance } from '$app/forms';
+	import { flip } from 'svelte/animate';
+	import { rise, slideY, flipParams } from '$lib/motion';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -68,7 +70,7 @@
 			</div>
 			<ul class="mt-3 space-y-2">
 				{#each flagged as c (c.id)}
-					<li class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2">
+					<li animate:flip={flipParams} in:rise out:slideY class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2">
 						<div class="min-w-0">
 							<p class="text-sm font-medium text-ink-100">{c.name}</p>
 							<p class="text-xs text-signal-amber">{c.problems.join(' · ')}</p>
@@ -105,8 +107,8 @@
 				<p class="text-sm text-ink-500">No committees yet — <a href="/admin/committees" class="text-brass-400 hover:underline">create one</a>.</p>
 			{:else}
 				<div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-					{#each conf.committees as c (c.id)}
-						<div class="card flex flex-col p-4 {c.problems.length ? 'border-signal-amber/40' : ''}">
+					{#each conf.committees as c, ci (c.id)}
+						<div in:rise={{ delay: Math.min(ci * 40, 320) }} class="card flex flex-col p-4 {c.problems.length ? 'border-signal-amber/40' : ''}">
 							<div class="flex items-center justify-between gap-2">
 								<span class="flex items-center gap-1.5 text-xs text-ink-300">
 									<span class="h-1.5 w-1.5 rounded-full {statusDot[c.status]}"></span>{statusLabel[c.status]}
