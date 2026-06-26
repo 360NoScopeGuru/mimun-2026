@@ -44,6 +44,7 @@
 				<p class="text-sm leading-tight font-medium text-ink-100">{data.delegate.fullName}</p>
 				<p class="text-xs leading-tight text-ink-400">Secretariat</p>
 			</div>
+			<a href="/admin/export" class="hidden text-xs text-ink-400 transition-colors hover:text-brass-300 sm:block" title="Download the full conference record (JSON)">Export</a>
 			<form method="POST" action="/logout">
 				<button type="submit" class="btn btn-ghost focus-ring px-3 py-1.5 text-xs">Sign out</button>
 			</form>
