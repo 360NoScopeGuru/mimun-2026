@@ -257,6 +257,7 @@
 	// Crisis committee — gated on the committee's rulesConfig.crisis flag. Kept
 	// isolated from the main state poll; the feed polls its own endpoint.
 	const crisisOn = !!(data.committee.rulesConfig as { crisis?: boolean } | null)?.crisis;
+	const practiceMode = !!(data.committee.rulesConfig as { practice?: boolean } | null)?.practice;
 	let crisisFeed = $state<{ id: string; text: string; createdAt: string | Date }[]>([]);
 	let crisisBusy = $state(false);
 	let directiveText = $state('');
@@ -302,6 +303,7 @@
 				<span class="flex items-center gap-1.5 text-xs text-ink-300">
 					<span class="h-1.5 w-1.5 rounded-full {statusDot[cstatus]}"></span>{statusLabel[cstatus]}
 				</span>
+				{#if practiceMode}<span class="rounded-full border border-signal-amber/40 px-2 py-0.5 text-[0.6rem] font-semibold text-signal-amber">PRACTICE</span>{/if}
 				{#if connection === 'reconnecting'}
 					<span class="flex items-center gap-1.5 text-xs text-signal-amber" title="Lost contact with the server — retrying">
 						<span class="h-1.5 w-1.5 rounded-full bg-signal-amber pulse-dot"></span>Reconnecting…

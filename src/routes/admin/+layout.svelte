@@ -12,7 +12,8 @@
 		['/admin/delegates', 'Delegates'],
 		['/admin/roster', 'Roster import'],
 		['/admin/print', 'Invite cards'],
-		['/admin/certificates', 'Certificates']
+		['/admin/certificates', 'Certificates'],
+		['/admin/practice', 'Practice']
 	];
 	const isActive = (href: string) => (href === '/admin' ? page.url.pathname === '/admin' : page.url.pathname.startsWith(href));
 </script>
