@@ -37,7 +37,24 @@ export const THIMUN: ProcedurePreset = {
 	majorities: { procedural: 'simple', resolution: 'simple', amendment: 'simple' }
 };
 
-export const PRESETS: Record<string, ProcedurePreset> = { THIMUN };
+// Additional circuits — the engine is preset-driven, so supporting another
+// conference's rules is configuration, not code. These are sensible starting
+// points; confirm a circuit's exact majorities/timings before its event.
+export const HMUN: ProcedurePreset = {
+	name: 'HMUN',
+	quorumFraction: 1 / 4,
+	defaults: { speakingSeconds: 60, moderatedTotalSeconds: 600, moderatedSpeakingSeconds: 45, unmoderatedTotalSeconds: 600 },
+	majorities: { procedural: 'simple', resolution: 'simple', amendment: 'simple' }
+};
+
+export const NMUN: ProcedurePreset = {
+	name: 'NMUN',
+	quorumFraction: 1 / 2,
+	defaults: { speakingSeconds: 90, moderatedTotalSeconds: 600, moderatedSpeakingSeconds: 60, unmoderatedTotalSeconds: 600 },
+	majorities: { procedural: 'simple', resolution: 'two_thirds', amendment: 'simple' }
+};
+
+export const PRESETS: Record<string, ProcedurePreset> = { THIMUN, HMUN, NMUN };
 
 export function presetFor(name: string | undefined): ProcedurePreset {
 	return (name && PRESETS[name]) || THIMUN;
