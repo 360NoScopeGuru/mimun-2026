@@ -5,6 +5,10 @@
 	import type { PageData } from './$types';
 	import Timer from '$lib/components/Timer.svelte';
 	import ActionBar from '$lib/components/ActionBar.svelte';
+	import Sheet from '$lib/components/Sheet.svelte';
+	import GlossaryTerm from '$lib/components/GlossaryTerm.svelte';
+	import { GLOSSARY } from '$lib/glossary';
+	import Coachmark from '$lib/components/Coachmark.svelte';
 
 	let { data }: { data: PageData } = $props();
 	const me = data.delegate!;
@@ -32,6 +36,17 @@
 	let noteTo = $state('dais');
 	let noteBody = $state('');
 	let notesOpen = $state(false); // drives the notes drawer (also opened from the mobile action bar)
+	let glossaryOpen = $state(false);
+	const glossaryEntries = Object.entries(GLOSSARY);
+	let coachOpen = $state(false);
+	function dismissCoach() {
+		coachOpen = false;
+		try {
+			localStorage.setItem(`mimun-onboarding-v1-${me.id}`, '1');
+		} catch {
+			/* ignore */
+		}
+	}
 	const unreadNotes = $derived(notes.filter((n) => n.toId === me.id && !n.readAt).length);
 
 	async function markNotesRead() {
@@ -204,6 +219,11 @@
 	onMount(() => {
 		scrollToBottom();
 		pollLoop();
+		try {
+			if (!localStorage.getItem(`mimun-onboarding-v1-${me.id}`)) coachOpen = true;
+		} catch {
+			/* ignore */
+		}
 		let crisisTimer: ReturnType<typeof setInterval> | undefined;
 		if (crisisOn) {
 			loadCrisis();
@@ -275,6 +295,7 @@
 			<h1 class="display mt-0.5 truncate text-xl text-ink-50">{data.committee.name}</h1>
 		</div>
 		<div class="flex items-center gap-4">
+			<button type="button" onclick={() => (glossaryOpen = true)} class="flex h-6 w-6 items-center justify-center rounded-full border border-white/10 text-xs text-ink-400 transition-colors hover:border-brass-400/40 hover:text-brass-200" title="Glossary — what do these terms mean?" aria-label="Open glossary">?</button>
 			<a href="/committee/{data.committee.slug}/lobbying" class="hidden text-xs text-ink-400 transition-colors hover:text-brass-300 md:block">Lobbying</a>
 			<a href="/committee/{data.committee.slug}/documents" class="hidden text-xs text-ink-400 transition-colors hover:text-brass-300 md:block">Documents</a>
 			{#if isChair}<a href="/committee/{data.committee.slug}/participation" class="hidden text-xs text-ink-400 transition-colors hover:text-brass-300 md:block">Participation</a>{/if}
@@ -285,7 +306,7 @@
 				</div>
 			{/if}
 			<div class="text-right">
-				<p class="label text-[0.65rem]">Quorum</p>
+				<p class="label text-[0.65rem]"><GlossaryTerm term="quorum">Quorum</GlossaryTerm></p>
 				<p class="font-mono text-sm tabular-nums {att.hasQuorum ? 'text-signal-green' : 'text-ink-300'}">
 					{att.present}/{att.total}
 					<span class="text-[0.7rem] text-ink-500">{att.hasQuorum ? 'met' : `need ${att.quorumThreshold}`}</span>
@@ -750,6 +771,34 @@
 			{/if}
 		</aside>
 	</div>
+
+	<Sheet bind:open={glossaryOpen} title="Glossary">
+		<dl class="space-y-3">
+			{#each glossaryEntries as [key, def] (key)}
+				<div>
+					<dt class="text-sm font-semibold text-ink-100">{key.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase())}</dt>
+					<dd class="mt-0.5 text-sm leading-relaxed text-ink-400">{def}</dd>
+				</div>
+			{/each}
+		</dl>
+	</Sheet>
+
+	{#if coachOpen}
+		<Coachmark title="Welcome to the floor" ondismiss={dismissCoach}>
+			{#if isChair}
+				<p>You’re chairing <strong>{data.committee.name}</strong>. Three moves to know:</p>
+				<p>· <strong>Recognize</strong> the next speaker · <strong>Open a vote</strong> when it’s time · your full <strong>Console</strong> sits in the dais panel.</p>
+				<p class="text-ink-400">Tap the <strong>?</strong> up top anytime for plain-English definitions.</p>
+			{:else if floor.mode === 'roll_call'}
+				<p><strong>First thing:</strong> tap <strong>Present</strong> (or Present &amp; voting) so you count toward quorum.</p>
+				<p>After that you can request to speak and vote. Tap the <strong>?</strong> up top if a term is unfamiliar.</p>
+			{:else}
+				<p>Your three moves as a delegate:</p>
+				<p>· <strong>Request to speak</strong> — you’ll see your place in line · <strong>Vote</strong> when one opens · pass private <strong>Notes</strong> to other delegations.</p>
+				<p class="text-ink-400">New to the jargon? Tap the <strong>?</strong> up top for the glossary.</p>
+			{/if}
+		</Coachmark>
+	{/if}
 
 	<!-- Mobile quick actions — the live action is one tap away without scrolling -->
 	<div class="lg:hidden">
