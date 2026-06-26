@@ -11,10 +11,10 @@
 <div class="surface-chamber flex min-h-screen flex-col">
 	<header class="flex h-[57px] items-center justify-between border-b border-white/[0.07] px-6">
 		<a href="/" class="flex items-center gap-3">
-			<span class="emblem h-8 w-8 rounded-lg text-sm">M</span>
+			<span class="emblem h-8 w-8 rounded-lg text-sm">{data.branding?.emblem ?? 'M'}</span>
 			<span class="flex flex-col leading-none">
-				<span class="display text-[1.05rem] font-semibold text-ink-50">MIMUN 2026</span>
-				<span class="label mt-1 text-[0.6rem] text-ink-500">Council Platform</span>
+				<span class="display text-[1.05rem] font-semibold text-ink-50">{data.branding?.wordmark ?? 'MIMUN 2026'}</span>
+				<span class="label mt-1 text-[0.6rem] text-ink-500">{data.branding?.tagline ?? 'Council Platform'}</span>
 			</span>
 		</a>
 
