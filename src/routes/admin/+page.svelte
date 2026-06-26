@@ -34,6 +34,7 @@
 	const totalCommittees = $derived(overview.reduce((n, c) => n + c.committees.length, 0));
 	const inSession = $derived(overview.reduce((n, c) => n + c.committees.filter((x) => x.status === 'in_session').length, 0));
 	const totalDelegates = $derived(overview.reduce((n, c) => n + c.committees.reduce((m, x) => m + x.delegates, 0), 0));
+	const flagged = $derived(overview.flatMap((conf) => conf.committees.filter((c) => c.problems.length > 0)));
 </script>
 
 <svelte:head><title>Dashboard — MIMUN 2026 Secretariat</title></svelte:head>
@@ -51,6 +52,40 @@
 		</div>
 	</div>
 
+	{#if flagged.length}
+		<div class="card mt-6 border-signal-amber/30 p-4">
+			<div class="flex items-center gap-2">
+				<span class="h-2 w-2 rounded-full bg-signal-amber pulse-dot"></span>
+				<p class="label text-signal-amber">Needs attention · {flagged.length}</p>
+			</div>
+			<ul class="mt-3 space-y-2">
+				{#each flagged as c (c.id)}
+					<li class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2">
+						<div class="min-w-0">
+							<p class="text-sm font-medium text-ink-100">{c.name}</p>
+							<p class="text-xs text-signal-amber">{c.problems.join(' · ')}</p>
+						</div>
+						<div class="flex shrink-0 gap-2">
+							<a href="/committee/{c.slug}" class="btn btn-ghost focus-ring px-3 py-1 text-xs">Open</a>
+							<a href="/admin/delegates?committee={c.id}" class="btn btn-quiet focus-ring px-3 py-1 text-xs">Delegates</a>
+						</div>
+					</li>
+				{/each}
+			</ul>
+		</div>
+	{/if}
+
+	<details class="card mt-6 p-4">
+		<summary class="label label-brass cursor-pointer select-none">First time? Conference setup steps</summary>
+		<ol class="mt-3 list-decimal space-y-1.5 pl-5 text-sm text-ink-300">
+			<li><a href="/admin/committees" class="text-brass-400 hover:underline">Create your committees</a> and pick each one's rules preset.</li>
+			<li><a href="/admin/roster" class="text-brass-400 hover:underline">Import your roster</a> (CSV: name, country, committee, role) — this generates invite codes.</li>
+			<li>Assign a <strong>chair</strong> to each committee (set the role under <a href="/admin/delegates" class="text-brass-400 hover:underline">Delegates</a>).</li>
+			<li><a href="/admin/print" class="text-brass-400 hover:underline">Print invite cards</a> and hand them out.</li>
+			<li>Watch the <strong>Needs attention</strong> panel during the event; <a href="/admin/export" class="text-brass-400 hover:underline">export the record</a> at the end.</li>
+		</ol>
+	</details>
+
 	{#each overview as conf (conf.id)}
 		<section class="mt-8">
 			<div class="mb-3 flex items-center gap-3">
@@ -63,7 +98,7 @@
 			{:else}
 				<div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
 					{#each conf.committees as c (c.id)}
-						<div class="card flex flex-col p-4">
+						<div class="card flex flex-col p-4 {c.problems.length ? 'border-signal-amber/40' : ''}">
 							<div class="flex items-center justify-between gap-2">
 								<span class="flex items-center gap-1.5 text-xs text-ink-300">
 									<span class="h-1.5 w-1.5 rounded-full {statusDot[c.status]}"></span>{statusLabel[c.status]}
