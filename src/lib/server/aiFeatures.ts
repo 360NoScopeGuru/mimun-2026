@@ -213,3 +213,36 @@ export function awardRecommendationPrompt(args: {
 export async function recommendAwards(args: Parameters<typeof awardRecommendationPrompt>[0]) {
 	return aiJson<AwardRecommendations>(awardRecommendationPrompt(args));
 }
+
+/* ------------------------------------------------------------------ *
+ * 5. Resolution overlap — duplicate / conflict detection across drafts
+ * ------------------------------------------------------------------ */
+
+export type ResolutionOverlap = {
+	verdict: string;
+	duplicates: { resolution: string; reason: string }[];
+	conflicts: { resolution: string; reason: string }[];
+};
+
+export function resolutionConflictPrompt(args: {
+	committeeName: string;
+	draft: { title: string; clauses: string[] };
+	others: { title: string; clauses: string[] }[];
+}): CompleteOptions {
+	const draftDoc = [`DRAFT — ${args.draft.title || '(untitled)'}`, ...args.draft.clauses.map((c, i) => `  ${i + 1}. ${c}`)].join('\n');
+	const othersDoc = args.others
+		.map((r, i) => [`RESOLUTION ${i + 1} — ${r.title || '(untitled)'}`, ...r.clauses.slice(0, 12).map((c, j) => `  ${j + 1}. ${c}`)].join('\n'))
+		.join('\n\n');
+	const system = [
+		`You compare a draft resolution against the other resolutions on the floor of the Model UN committee "${args.committeeName}".`,
+		'Identify (a) DUPLICATES — resolutions that substantially overlap the draft in substance, and (b) CONFLICTS — resolutions whose operative provisions would contradict or undercut the draft if both passed.',
+		'Reference resolutions by title and be specific about which provisions overlap or clash. If there is no meaningful overlap or conflict, return empty arrays and say so in the verdict.',
+		'',
+		'Return ONLY a JSON object: { "verdict": string, "duplicates": [ { "resolution": string, "reason": string } ], "conflicts": [ { "resolution": string, "reason": string } ] }. No prose outside the JSON.'
+	].join('\n');
+	return { system, prompt: `${draftDoc}\n\n--- OTHER RESOLUTIONS ---\n\n${othersDoc}`, temperature: 0.2, maxTokens: 800 };
+}
+
+export async function detectResolutionOverlap(args: Parameters<typeof resolutionConflictPrompt>[0]) {
+	return aiJson<ResolutionOverlap>(resolutionConflictPrompt(args));
+}

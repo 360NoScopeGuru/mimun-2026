@@ -37,12 +37,45 @@
 		}
 	}
 
+	// AI overlap check — compare this draft against the other drafts on the floor.
+	type Overlap = { verdict: string; duplicates: { resolution: string; reason: string }[]; conflicts: { resolution: string; reason: string }[] };
+	let overlap = $state<Overlap | null>(null);
+	let overlapProvider = $state('');
+	let checking = $state(false);
+	let overlapError = $state('');
+
+	async function checkOverlap() {
+		if (!sel || checking) return;
+		checking = true;
+		overlapError = '';
+		overlap = null;
+		try {
+			const res = await fetch(`/committee/${data.committee.slug}/resolutions/conflicts`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ resolutionId: sel.id })
+			});
+			const body = await res.json().catch(() => ({}));
+			if (!res.ok) overlapError = body.message || 'Could not check for overlap right now.';
+			else {
+				overlap = body.overlap;
+				overlapProvider = body.provider;
+			}
+		} catch {
+			overlapError = 'Could not reach the overlap checker.';
+		} finally {
+			checking = false;
+		}
+	}
+
 	// Clear stale feedback when switching to a different draft.
 	$effect(() => {
 		sel?.id;
 		feedback = null;
 		feedbackProvider = '';
 		reviewError = '';
+		overlap = null;
+		overlapError = '';
 	});
 
 	const roleLabel: Record<string, string> = { main_submitter: 'Main submitter', co_submitter: 'Co-submitter', signatory: 'Signatory' };
@@ -206,6 +239,36 @@
 									Ask the parliamentarian to review this draft
 								</button>
 								{#if reviewError}<p class="mt-2 text-sm text-[color:var(--color-signal-red)]">{reviewError}</p>{/if}
+							{/if}
+						</div>
+					{/if}
+
+					<!-- AI overlap check across drafts -->
+					{#if data.aiConfigured && (sel.preambulatory.length > 0 || sel.operative.length > 0)}
+						<div class="mt-4 border-t border-paper-line pt-4">
+							{#if checking}
+								<p class="text-sm text-paper-ink-500">Comparing against the other drafts on the floor…</p>
+							{:else}
+								<button type="button" onclick={checkOverlap} class="focus-ring rounded-lg border border-paper-line px-3 py-1.5 text-xs text-paper-ink-700 hover:bg-paper-100">Check for overlap with other drafts</button>
+							{/if}
+							{#if overlapError}<p class="mt-2 text-sm text-[color:var(--color-signal-red)]">{overlapError}</p>{/if}
+							{#if overlap}
+								<div class="mt-3 rounded-xl border border-paper-line bg-paper-100/50 p-4">
+									<p class="text-sm text-paper-ink-900">{overlap.verdict}</p>
+									{#if overlap.duplicates.length}
+										<p class="label mt-3 text-paper-ink-500">Overlaps</p>
+										<ul class="mt-1 space-y-1">
+											{#each overlap.duplicates as d (d.resolution + d.reason)}<li class="text-sm text-paper-ink-700"><span class="font-medium text-paper-ink-900">{d.resolution}</span> — {d.reason}</li>{/each}
+										</ul>
+									{/if}
+									{#if overlap.conflicts.length}
+										<p class="label mt-3 text-red-800">Conflicts</p>
+										<ul class="mt-1 space-y-1">
+											{#each overlap.conflicts as c (c.resolution + c.reason)}<li class="text-sm text-paper-ink-700"><span class="font-medium text-paper-ink-900">{c.resolution}</span> — {c.reason}</li>{/each}
+										</ul>
+									{/if}
+									{#if overlapProvider}<p class="label mt-2 text-[0.55rem] text-paper-ink-500">via {overlapProvider}</p>{/if}
+								</div>
 							{/if}
 						</div>
 					{/if}
