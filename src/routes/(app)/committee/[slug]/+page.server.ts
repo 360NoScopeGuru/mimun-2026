@@ -464,5 +464,20 @@ export const actions: Actions = {
 		await db.update(committees).set({ status: status as typeof committees.$inferInsert.status }).where(eq(committees.id, committee.id));
 		await audit(committee, chair.id, 'set_status', { status });
 		return { success: true };
+	},
+
+	// Crisis committee: chair enables/disables crisis mode (+ optional scenario).
+	toggleCrisis: async ({ request, locals, params }) => {
+		const committee = await loadCommittee(params.slug);
+		const chair = assertChair(locals.delegate, committee.id);
+
+		const form = await request.formData();
+		const on = String(form.get('on')) === 'true';
+		const scenario = String(form.get('scenario') ?? '').slice(0, 500);
+		const prev = (committee.rulesConfig ?? {}) as Record<string, unknown>;
+		const rulesConfig = { ...prev, crisis: on, crisisScenario: scenario || prev.crisisScenario };
+		await db.update(committees).set({ rulesConfig }).where(eq(committees.id, committee.id));
+		await audit(committee, chair.id, 'toggle_crisis', { on });
+		return { success: true };
 	}
 };

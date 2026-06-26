@@ -204,13 +204,54 @@
 	onMount(() => {
 		scrollToBottom();
 		pollLoop();
+		let crisisTimer: ReturnType<typeof setInterval> | undefined;
+		if (crisisOn) {
+			loadCrisis();
+			crisisTimer = setInterval(loadCrisis, 3000);
+		}
 		return () => {
 			stopped = true;
 			clearTimeout(pollTimer);
+			if (crisisTimer) clearInterval(crisisTimer);
 		};
 	});
 
 	const tallyBase = $derived(vote ? vote.tally.for + vote.tally.against : 0);
+
+	// Crisis committee — gated on the committee's rulesConfig.crisis flag. Kept
+	// isolated from the main state poll; the feed polls its own endpoint.
+	const crisisOn = !!(data.committee.rulesConfig as { crisis?: boolean } | null)?.crisis;
+	let crisisFeed = $state<{ id: string; text: string; createdAt: string | Date }[]>([]);
+	let crisisBusy = $state(false);
+	let directiveText = $state('');
+
+	async function loadCrisis() {
+		if (!crisisOn) return;
+		try {
+			const res = await fetch(`/committee/${data.committee.slug}/crisis`);
+			if (res.ok) crisisFeed = (await res.json()).updates ?? [];
+		} catch {
+			/* ignore */
+		}
+	}
+
+	async function generateCrisis() {
+		if (crisisBusy) return;
+		crisisBusy = true;
+		try {
+			await fetch(`/committee/${data.committee.slug}/crisis`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ directive: directiveText })
+			});
+			directiveText = '';
+			await loadCrisis();
+		} catch {
+			/* ignore */
+		} finally {
+			crisisBusy = false;
+		}
+	}
 </script>
 
 <svelte:head><title>{data.committee.name} — MIMUN 2026</title></svelte:head>
@@ -310,6 +351,31 @@
 
 		<!-- The dais -->
 		<aside class="flex flex-col gap-3 bg-ink-950/30 p-3 sm:p-4 lg:overflow-y-auto">
+			<!-- Crisis Director (crisis committees only) -->
+			{#if crisisOn}
+				<div class="card-live p-4">
+					<div class="flex items-center justify-between gap-2">
+						<p class="label label-brass">Crisis Director</p>
+						<span class="label text-[0.55rem] text-ink-600">AI</span>
+					</div>
+					<div class="mt-3 max-h-72 space-y-2 overflow-y-auto">
+						{#each crisisFeed as u (u.id)}
+							<div class="rounded-lg border border-signal-red/25 bg-signal-red/[0.06] px-3 py-2">
+								<p class="text-sm leading-relaxed text-ink-100">{u.text}</p>
+							</div>
+						{:else}
+							<p class="text-sm text-ink-500">The situation is calm — for now.</p>
+						{/each}
+					</div>
+					{#if isChair}
+						<div class="mt-3 space-y-2">
+							<input bind:value={directiveText} placeholder="Directive or prompt for the next update (optional)…" class="input py-2 text-sm" />
+							<button type="button" onclick={generateCrisis} disabled={crisisBusy} class="btn btn-brass focus-ring w-full py-2.5 text-sm disabled:opacity-40">{crisisBusy ? 'The situation develops…' : 'Generate crisis update'}</button>
+						</div>
+					{/if}
+				</div>
+			{/if}
+
 			<!-- Roll call (delegate sets own presence) -->
 			{#if floor.mode === 'roll_call'}
 				<div class="card p-4">
@@ -653,6 +719,19 @@
 								<button class="btn btn-brass focus-ring mt-2 w-full py-2.5 text-sm">Open vote</button>
 							</form>
 						{/if}
+
+						<!-- Crisis committee -->
+						<form method="POST" action="?/toggleCrisis" use:enhance={() => () => location.reload()} class="rounded-lg border border-white/[0.07] p-3">
+							<p class="label mb-2 text-[0.65rem]">Crisis committee</p>
+							{#if crisisOn}
+								<input type="hidden" name="on" value="false" />
+								<button class="btn btn-ghost focus-ring w-full py-2.5 text-sm">Disable crisis mode</button>
+							{:else}
+								<input type="hidden" name="on" value="true" />
+								<input name="scenario" placeholder="Crisis scenario (premise)…" class="input mb-2 py-2 text-sm" />
+								<button class="btn btn-brass focus-ring w-full py-2.5 text-sm">Enable crisis mode</button>
+							{/if}
+						</form>
 
 						<!-- Session status -->
 						<div>

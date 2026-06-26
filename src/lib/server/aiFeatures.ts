@@ -246,3 +246,32 @@ export function resolutionConflictPrompt(args: {
 export async function detectResolutionOverlap(args: Parameters<typeof resolutionConflictPrompt>[0]) {
 	return aiJson<ResolutionOverlap>(resolutionConflictPrompt(args));
 }
+
+/* ------------------------------------------------------------------ *
+ * 6. Crisis Director — live, reactive crisis updates for a crisis committee
+ * ------------------------------------------------------------------ */
+
+export function crisisUpdatePrompt(args: {
+	committeeName: string;
+	scenario: string;
+	directive: string;
+	recentActions: string[];
+}): CompleteOptions {
+	const ctx = [
+		`Committee: ${args.committeeName}.`,
+		args.scenario ? `Crisis scenario: ${args.scenario}` : '',
+		args.directive ? `The committee has just acted: ${args.directive}` : '',
+		args.recentActions.length ? `Recent floor activity:\n${args.recentActions.map((a) => `  - ${a}`).join('\n')}` : ''
+	]
+		.filter(Boolean)
+		.join('\n');
+	const system = [
+		'You are the Crisis Director for a Model UN crisis committee. You narrate the unfolding situation by issuing short, vivid CRISIS UPDATES that react to the committee’s decisions and raise the stakes.',
+		'Write ONE update: 2–4 sentences, present tense, concrete and consequential — a development, an actor’s response, a new complication. React to the committee’s most recent action if one is given. Do not resolve the whole crisis; leave the committee room to respond. No headers or preamble — return only the update text.'
+	].join('\n');
+	return { system, prompt: ctx || 'Open the crisis with an initial situation update.', temperature: 0.8, maxTokens: 320 };
+}
+
+export async function generateCrisisUpdate(args: Parameters<typeof crisisUpdatePrompt>[0]) {
+	return aiComplete(crisisUpdatePrompt(args));
+}

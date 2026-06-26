@@ -230,6 +230,18 @@ export const points = pgTable('points', {
 	resolvedAt: timestamp('resolved_at', { withTimezone: true })
 }, (t) => [index('points_committee_idx').on(t.committeeId)]);
 
+// Crisis committee — the AI Director's live updates / injects to the floor.
+export const crisisUpdates = pgTable('crisis_updates', {
+	id: uuid('id').defaultRandom().primaryKey(),
+	committeeId: uuid('committee_id')
+		.notNull()
+		.references(() => committees.id),
+	kind: text('kind').notNull().default('update'),
+	text: text('text').notNull(),
+	authorId: uuid('author_id').references(() => delegates.id),
+	createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+}, (t) => [index('crisis_updates_committee_created_idx').on(t.committeeId, t.createdAt)]);
+
 /* ------------------------------------------------------------------ *
  * Voting
  * ------------------------------------------------------------------ */
