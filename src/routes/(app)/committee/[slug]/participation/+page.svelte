@@ -111,6 +111,41 @@
 			summarizing = false;
 		}
 	}
+
+	// AI award recommendations (chair) — grounded in the measured activity.
+	type Award = { award: string; delegate: string; reason: string };
+	let awards = $state<Award[]>([]);
+	let awardsProvider = $state('');
+	let recommending = $state(false);
+	let awardsError = $state('');
+
+	async function generateAwards() {
+		if (recommending) return;
+		recommending = true;
+		awardsError = '';
+		awards = [];
+		try {
+			const res = await fetch(`/committee/${data.committee.slug}/analytics/awards`, { method: 'POST' });
+			const body = await res.json().catch(() => ({}));
+			if (!res.ok) awardsError = body.message || 'Could not generate awards right now.';
+			else {
+				awards = body.awards ?? [];
+				awardsProvider = body.provider;
+			}
+		} catch {
+			awardsError = 'Could not reach the awards service.';
+		} finally {
+			recommending = false;
+		}
+	}
+
+	// Heatmap cell colour: green = aligned, red = opposed, faint = neutral.
+	function cellColor(v: number): string {
+		if (v > 0) return `rgba(91,191,143,${Math.min(0.85, 0.15 + v * 0.7)})`;
+		if (v < 0) return `rgba(217,105,78,${Math.min(0.85, 0.15 + -v * 0.7)})`;
+		return 'rgba(255,255,255,0.05)';
+	}
+	const maxBucket = $derived(Math.max(1, ...data.engagement.timeline.map((b) => b.count)));
 </script>
 
 <svelte:head><title>Participation — {data.committee.name}</title></svelte:head>
@@ -209,5 +244,100 @@
 		</div>
 
 		<p class="label mt-4 text-ink-500">Score = speeches·3 + motions·2 + amendments·2 + points·1 + messages·0.5 + votes·0.5</p>
+
+		<!-- ── AI award recommendations ──────────────────────────────── -->
+		<div class="card mt-8 p-5">
+			<div class="flex flex-wrap items-center justify-between gap-3">
+				<div>
+					<p class="label label-brass">Award recommendations</p>
+					<p class="mt-1 text-xs text-ink-500">Defensible picks grounded only in measured activity — each with its justification.</p>
+				</div>
+				{#if data.aiConfigured}
+					<button type="button" onclick={generateAwards} disabled={recommending} class="btn btn-brass focus-ring px-4 py-2 text-sm disabled:opacity-40">
+						{recommending ? 'Deliberating…' : awards.length ? 'Regenerate' : 'Recommend awards'}
+					</button>
+				{:else}
+					<span class="text-xs text-ink-500">AI not configured</span>
+				{/if}
+			</div>
+			{#if awardsError}<p class="mt-3 text-sm text-signal-amber">{awardsError}</p>{/if}
+			{#if awards.length}
+				<div class="mt-4 grid gap-3 sm:grid-cols-2">
+					{#each awards as a (a.award + a.delegate)}
+						<div class="rounded-xl border border-brass-400/20 bg-brass-400/[0.04] p-4">
+							<p class="label label-brass">{a.award}</p>
+							<p class="mt-1 text-base font-semibold text-ink-50">{a.delegate}</p>
+							<p class="mt-1 text-sm leading-relaxed text-ink-300">{a.reason}</p>
+						</div>
+					{/each}
+				</div>
+				{#if awardsProvider}<p class="label mt-2 text-[0.55rem] text-ink-600">via {awardsProvider}</p>{/if}
+			{/if}
+		</div>
+
+		<!-- ── Voting blocs heatmap ──────────────────────────────────── -->
+		{#if data.blocs.votes > 0}
+			<div class="card mt-4 p-5">
+				<p class="label label-brass">Voting blocs</p>
+				<p class="mt-1 text-xs text-ink-500">
+					Who voted together across {data.blocs.votes} vote{data.blocs.votes === 1 ? '' : 's'} — <span class="text-signal-green">green</span> aligned, <span class="text-signal-red">red</span> opposed.
+				</p>
+				{#if data.blocs.blocs.some((b) => b.members.length > 1)}
+					<div class="mt-3 flex flex-wrap gap-2">
+						{#each data.blocs.blocs as b, i (i)}
+							{#if b.members.length > 1}
+								<span class="rounded-lg border border-white/[0.08] bg-white/[0.02] px-3 py-1.5 text-xs text-ink-200"><span class="text-brass-400">Bloc {i + 1}</span> · {b.members.join(', ')}</span>
+							{/if}
+						{/each}
+					</div>
+				{/if}
+				<div class="mt-4 space-y-0.5 overflow-x-auto pb-1">
+					{#each data.blocs.delegates as d, i (d.id)}
+						<div class="flex items-center gap-2">
+							<span class="w-28 shrink-0 truncate text-right text-[0.7rem] text-ink-300" title={d.label}>{d.label}</span>
+							<div class="flex gap-0.5">
+								{#each data.blocs.matrix[i] as v, j (j)}
+									<span class="h-4 w-4 shrink-0 rounded-[3px]" style="background: {cellColor(v)};" title="{d.label} vs {data.blocs.delegates[j].label}: {v}"></span>
+								{/each}
+							</div>
+						</div>
+					{/each}
+				</div>
+			</div>
+		{/if}
+
+		<!-- ── Engagement over time ──────────────────────────────────── -->
+		<div class="card mt-4 p-5">
+			<p class="label label-brass">Engagement over time</p>
+			<div class="mt-3 flex h-20 items-end gap-1">
+				{#each data.engagement.timeline as b (b.t)}
+					<div class="flex-1 rounded-t bg-brass-500/60" style="height: {(b.count / maxBucket) * 100}%" title="{b.count} actions"></div>
+				{:else}
+					<p class="text-sm text-ink-500">No activity yet.</p>
+				{/each}
+			</div>
+			<div class="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-ink-400">
+				<span><span class="font-mono text-ink-100">{data.engagement.totals.messages}</span> messages</span>
+				<span><span class="font-mono text-ink-100">{data.engagement.totals.speeches}</span> speeches</span>
+				<span><span class="font-mono text-ink-100">{data.engagement.totals.motions}</span> motions</span>
+				<span><span class="font-mono text-ink-100">{data.engagement.totals.ballots}</span> ballots cast</span>
+			</div>
+		</div>
+
+		<!-- ── Negotiation network ───────────────────────────────────── -->
+		{#if data.network.length}
+			<div class="card mt-4 p-5">
+				<p class="label label-brass">Negotiation network</p>
+				<p class="mt-1 text-xs text-ink-500">Private notes passed between delegations, busiest first.</p>
+				<ul class="mt-3 space-y-1.5">
+					{#each data.network.slice(0, 12) as e (e.from + '→' + e.to)}
+						<li class="flex items-center justify-between gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-sm">
+							<span class="text-ink-200">{e.from} <span class="text-ink-500">→</span> {e.to}</span>
+							<span class="font-mono text-xs text-ink-400">{e.count} note{e.count === 1 ? '' : 's'}{#if e.avgReplyLagSec !== null} · {e.avgReplyLagSec < 60 ? e.avgReplyLagSec + 's' : Math.round(e.avgReplyLagSec / 60) + 'm'} reply{/if}</span>
+						</li>
+					{/each}
+				</ul>
+			</div>
+		{/if}
 	</div>
 </div>

@@ -174,3 +174,42 @@ export function sessionSummaryPrompt(stats: SessionStats): CompleteOptions {
 export async function summarizeSession(stats: SessionStats) {
 	return aiComplete(sessionSummaryPrompt(stats));
 }
+
+/* ------------------------------------------------------------------ *
+ * 4. Award recommendations (chair) — grounded ONLY in measured activity
+ * ------------------------------------------------------------------ */
+
+export type AwardRecommendation = { award: string; delegate: string; reason: string };
+export type AwardRecommendations = { awards: AwardRecommendation[] };
+
+const AWARD_CONTRACT = [
+	'Return ONLY a JSON object with this exact shape:',
+	'{ "awards": [ { "award": string, "delegate": string, "reason": string } ] }',
+	'Use the exact delegation labels provided. No prose outside the JSON.'
+].join('\n');
+
+export function awardRecommendationPrompt(args: {
+	committeeName: string;
+	topic: string;
+	delegates: { label: string; score: number; speeches: number; motions: number; amendments: number; points: number; messages: number; votes: number }[];
+}): CompleteOptions {
+	const table = args.delegates
+		.slice(0, 40)
+		.map(
+			(d) =>
+				`${d.label} — score ${d.score}; speeches ${d.speeches}, motions ${d.motions}, amendments ${d.amendments}, points ${d.points}, messages ${d.messages}, votes ${d.votes}`
+		)
+		.join('\n');
+	const system = [
+		`You are the dais of the Model UN committee "${args.committeeName}" (topic: "${args.topic || 'the agenda'}") deciding session awards.`,
+		'You are given each delegation’s MEASURED activity. Recommend awards using ONLY these metrics — do not invent speeches, quotes, alliances, or facts the numbers do not support. Justify each award with the specific metrics that earned it.',
+		'Fill these only where the data supports a defensible choice: "Best Delegate", "Outstanding Delegate", "Honourable Mention". Prefer fewer, well-justified awards over forced ones. Do not award on dimensions you were not given (e.g. position-paper quality).',
+		'',
+		AWARD_CONTRACT
+	].join('\n');
+	return { system, prompt: table, temperature: 0.2, maxTokens: 700 };
+}
+
+export async function recommendAwards(args: Parameters<typeof awardRecommendationPrompt>[0]) {
+	return aiJson<AwardRecommendations>(awardRecommendationPrompt(args));
+}
