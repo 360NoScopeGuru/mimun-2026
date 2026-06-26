@@ -24,6 +24,7 @@
 		padding: 1.5rem;
 		background: rgba(3, 6, 14, 0.66);
 		backdrop-filter: blur(3px);
+		animation: cm-fade 0.24s ease;
 	}
 	.cm-card {
 		width: 100%;
@@ -33,5 +34,24 @@
 		background: linear-gradient(180deg, var(--color-ink-700), var(--color-ink-850));
 		box-shadow: 0 30px 60px -24px rgba(0, 0, 0, 0.9);
 		padding: 1.5rem;
+		animation: cm-rise 0.34s cubic-bezier(0.22, 1, 0.36, 1);
+	}
+
+	@keyframes cm-fade {
+		from {
+			opacity: 0;
+		}
+	}
+	@keyframes cm-rise {
+		from {
+			transform: translateY(10px) scale(0.97);
+			opacity: 0;
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.cm-root,
+		.cm-card {
+			animation: none;
+		}
 	}
 </style>

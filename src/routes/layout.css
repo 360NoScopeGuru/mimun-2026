@@ -418,6 +418,54 @@ body {
 	animation: pulse-dot 1.6s ease-in-out infinite;
 }
 
+/* Live vote tally — bars grow toward their share as ballots stream in over the
+   poll, rather than teleporting. */
+.tally-bar {
+	transition: width 0.55s var(--ease-out-soft);
+}
+
+/* Counter tick — a brief brass flash on the element whose value just changed
+   (vote tallies, quorum, the floor-mode chip). Driven by `use:flash`. */
+@keyframes flash-tick {
+	0% {
+		color: var(--color-brass-200);
+		transform: translateY(-1px);
+	}
+	100% {
+		transform: translateY(0);
+	}
+}
+.is-flashing {
+	animation: flash-tick 0.5s var(--ease-out-soft);
+}
+
+/* Wax strike — the adoption seal stamps down when an adopted resolution opens,
+   settling into its resting -8deg tilt. */
+@keyframes wax-strike {
+	0% {
+		transform: scale(1.55) rotate(7deg);
+		opacity: 0;
+	}
+	60% {
+		transform: scale(0.93) rotate(-10deg);
+	}
+	100% {
+		transform: scale(1) rotate(-8deg);
+		opacity: 1;
+	}
+}
+.seal {
+	animation: wax-strike 0.5s var(--ease-out-soft) both;
+}
+
+/* Route crossfade (View Transitions API, opted in via onNavigate in the root
+   layout). Tune the default root cross-fade to the brand's soft easing. */
+::view-transition-old(root),
+::view-transition-new(root) {
+	animation-duration: 0.24s;
+	animation-timing-function: var(--ease-out-soft);
+}
+
 /* Touch: guarantee a 44px hit target for every button/input on coarse pointers
    (tablets/phones), regardless of a component's compact padding. */
 @media (pointer: coarse) {
@@ -433,5 +481,18 @@ body {
 	}
 	.placard {
 		transition: none;
+	}
+	.tally-bar {
+		transition: none;
+	}
+	.is-flashing,
+	.seal {
+		animation: none;
+	}
+	/* Skip the route cross-fade entirely. */
+	::view-transition-group(*),
+	::view-transition-old(*),
+	::view-transition-new(*) {
+		animation: none !important;
 	}
 }

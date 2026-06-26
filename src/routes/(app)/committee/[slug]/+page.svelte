@@ -9,6 +9,8 @@
 	import GlossaryTerm from '$lib/components/GlossaryTerm.svelte';
 	import { GLOSSARY } from '$lib/glossary';
 	import Coachmark from '$lib/components/Coachmark.svelte';
+	import { flip } from 'svelte/animate';
+	import { rise, pop, slideY, flipParams, flash } from '$lib/motion';
 
 	let { data }: { data: PageData } = $props();
 	const me = data.delegate!;
@@ -298,7 +300,7 @@
 	<div class="flex shrink-0 flex-wrap items-center justify-between gap-x-5 gap-y-2 border-b border-white/[0.07] px-5 py-3.5 sm:px-6">
 		<div class="min-w-0">
 			<div class="flex items-center gap-2">
-				<p class="label label-brass">{modeLabel[floor.mode] ?? floor.mode}</p>
+				<p class="label label-brass" use:flash={floor.mode}>{modeLabel[floor.mode] ?? floor.mode}</p>
 				<span class="h-1 w-1 rounded-full bg-ink-600"></span>
 				<span class="flex items-center gap-1.5 text-xs text-ink-300">
 					<span class="h-1.5 w-1.5 rounded-full {statusDot[cstatus]}"></span>{statusLabel[cstatus]}
@@ -325,7 +327,7 @@
 			{/if}
 			<div class="text-right">
 				<p class="label text-[0.65rem]"><GlossaryTerm term="quorum">Quorum</GlossaryTerm></p>
-				<p class="font-mono text-sm tabular-nums {att.hasQuorum ? 'text-signal-green' : 'text-ink-300'}">
+				<p class="font-mono text-sm tabular-nums {att.hasQuorum ? 'text-signal-green' : 'text-ink-300'}" use:flash={att.present}>
 					{att.present}/{att.total}
 					<span class="text-[0.7rem] text-ink-500">{att.hasQuorum ? 'met' : `need ${att.quorumThreshold}`}</span>
 				</p>
@@ -334,7 +336,7 @@
 	</div>
 
 	{#if announcement && announcement.at !== annDismissed}
-		<div class="flex shrink-0 items-center gap-3 border-b border-brass-600/30 bg-brass-500/[0.08] px-5 py-2.5 sm:px-6">
+		<div transition:slideY class="flex shrink-0 items-center gap-3 border-b border-brass-600/30 bg-brass-500/[0.08] px-5 py-2.5 sm:px-6">
 			<span class="label label-brass shrink-0 text-[0.6rem]">Secretariat</span>
 			<p class="min-w-0 flex-1 truncate text-sm text-ink-100">{announcement.text}</p>
 			<button type="button" onclick={dismissAnnouncement} class="btn btn-quiet focus-ring shrink-0 px-2 py-1 text-xs" aria-label="Dismiss announcement">✕</button>
@@ -346,7 +348,7 @@
 		<section class="flex min-h-0 flex-col lg:border-r lg:border-white/[0.07]">
 			<div bind:this={scrollEl} class="flex-1 space-y-5 overflow-y-auto px-5 py-6 max-lg:max-h-[52vh] sm:px-6">
 				{#each messages as message (message.id)}
-					<div class="flex gap-3" class:opacity-50={message.pending}>
+					<div in:rise class="flex gap-3" class:opacity-50={message.pending}>
 						<div class="emblem mt-0.5 h-8 w-8 shrink-0 rounded-full text-xs">{message.author.slice(0, 1)}</div>
 						<div class="min-w-0">
 							<div class="flex items-baseline gap-2">
@@ -407,7 +409,7 @@
 					</div>
 					<div class="mt-3 max-h-72 space-y-2 overflow-y-auto">
 						{#each crisisFeed as u (u.id)}
-							<div class="rounded-lg border border-signal-red/25 bg-signal-red/[0.06] px-3 py-2">
+							<div animate:flip={flipParams} in:rise class="rounded-lg border border-signal-red/25 bg-signal-red/[0.06] px-3 py-2">
 								<p class="text-sm leading-relaxed text-ink-100">{u.text}</p>
 							</div>
 						{:else}
@@ -445,7 +447,7 @@
 
 			<!-- Open vote — the live-action surface -->
 			{#if vote}
-				<div class="card-live p-4">
+				<div transition:pop class="card-live p-4">
 					<div class="mb-1.5 flex items-center justify-between">
 						<p class="label label-brass">Vote in progress</p>
 						<span class="label text-[0.65rem] text-ink-500">
@@ -459,9 +461,9 @@
 							<div class="flex items-center gap-2.5">
 								<span class="w-16 text-xs text-ink-300">{text}</span>
 								<div class="h-2.5 flex-1 overflow-hidden rounded-full bg-black/30 shadow-[inset_0_1px_2px_rgba(0,0,0,0.6)]">
-									<div class="{color} h-full rounded-full shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]" style="width: {tallyBase + vote.tally.abstain > 0 ? (vote.tally[key as 'for'] / (tallyBase + vote.tally.abstain)) * 100 : 0}%"></div>
+									<div class="tally-bar {color} h-full rounded-full shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]" style="width: {tallyBase + vote.tally.abstain > 0 ? (vote.tally[key as 'for'] / (tallyBase + vote.tally.abstain)) * 100 : 0}%"></div>
 								</div>
-								<span class="w-6 text-right font-mono text-sm tabular-nums text-ink-100">{vote.tally[key as 'for']}</span>
+								<span class="w-6 text-right font-mono text-sm tabular-nums text-ink-100" use:flash={vote.tally[key as 'for']}>{vote.tally[key as 'for']}</span>
 							</div>
 						{/each}
 						{#if vote.tally.pass > 0}
@@ -504,13 +506,15 @@
 			<div class="card p-4">
 				<p class="label label-brass">Speaking now</p>
 				{#if floor.currentSpeaker}
-					<div class="placard mt-3 flex items-center justify-between gap-3">
-						<div class="min-w-0">
-							<p class="truncate text-base font-semibold text-ink-50 [text-shadow:0_1px_0_rgba(0,0,0,0.55)]">{floor.currentSpeaker.name}</p>
-							{#if floor.currentSpeaker.country}<p class="label text-[0.65rem] text-ink-400">{floor.currentSpeaker.country}</p>{/if}
+					{#key floor.currentSpeaker.id}
+						<div in:rise={{ y: 10 }} class="placard mt-3 flex items-center justify-between gap-3">
+							<div class="min-w-0">
+								<p class="truncate text-base font-semibold text-ink-50 [text-shadow:0_1px_0_rgba(0,0,0,0.55)]">{floor.currentSpeaker.name}</p>
+								{#if floor.currentSpeaker.country}<p class="label text-[0.65rem] text-ink-400">{floor.currentSpeaker.country}</p>{/if}
+							</div>
+							<Timer endsAt={floor.speakerTimerEndsAt} />
 						</div>
-						<Timer endsAt={floor.speakerTimerEndsAt} />
-					</div>
+					{/key}
 				{:else}
 					<p class="mt-3 text-sm text-ink-500">No one holds the floor.</p>
 				{/if}
@@ -524,7 +528,7 @@
 				</div>
 				<ol class="space-y-1.5">
 					{#each queue as entry, i (entry.id)}
-						<li class="flex items-center gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
+						<li animate:flip={flipParams} in:rise out:slideY class="flex items-center gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
 							<span class="font-mono text-xs font-medium text-brass-400 tabular-nums">{(i + 1).toString().padStart(2, '0')}</span>
 							<div class="min-w-0 flex-1">
 								<p class="truncate text-sm text-ink-100">{entry.name}</p>
@@ -550,7 +554,7 @@
 					{#if pendingMotions.length}
 						<ul class="space-y-2">
 							{#each pendingMotions as m (m.id)}
-								<li class="rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
+								<li animate:flip={flipParams} in:rise out:slideY class="rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
 									<p class="text-sm text-ink-100">{m.label}</p>
 									<p class="text-xs text-ink-500">
 										{m.proposerCountry || m.proposer}{#if num(m.params.totalSeconds)} · {Math.round(num(m.params.totalSeconds)! / 60)} min{/if}{#if str(m.params.topic)} · {str(m.params.topic)}{/if}
@@ -570,7 +574,7 @@
 					{#if points.length}
 						<div class="mt-3 space-y-1 {pendingMotions.length ? 'border-t border-white/[0.06] pt-3' : ''}">
 							{#each points as p (p.id)}
-								<p class="text-xs text-ink-400"><span class="text-brass-400">{pointLabel[p.type]}</span> — {p.byCountry || p.by}{#if p.body}: {p.body}{/if}</p>
+								<p in:rise class="text-xs text-ink-400"><span class="text-brass-400">{pointLabel[p.type]}</span> — {p.byCountry || p.by}{#if p.body}: {p.body}{/if}</p>
 							{/each}
 						</div>
 					{/if}
@@ -634,7 +638,7 @@
 
 				<div class="mt-3 max-h-56 space-y-1.5 overflow-y-auto">
 					{#each notes as n (n.id)}
-						<div class="rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2">
+						<div animate:flip={flipParams} in:rise class="rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2">
 							<p class="label text-[0.6rem] text-ink-500">
 								{#if n.fromId === me.id}You → {n.toName ? (n.toCountry || n.toName) : 'The dais'}
 								{:else}{n.fromCountry || n.fromName} → {n.toName ? (n.toCountry || n.toName) : 'The dais'}{/if}
