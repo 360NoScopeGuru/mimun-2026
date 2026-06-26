@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { enhance } from '$app/forms';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -51,6 +52,13 @@
 			<div><p class="font-mono text-2xl text-ink-50 tabular-nums">{totalDelegates}</p><p class="label text-[0.6rem]">Delegates</p></div>
 		</div>
 	</div>
+
+	<form method="POST" action="?/broadcast" use:enhance class="card mt-6 flex flex-wrap items-center gap-2 p-3">
+		<p class="label label-brass shrink-0">Broadcast</p>
+		<input name="text" placeholder="Message to all committees (e.g. lunch at 1pm)…" maxlength="280" autocomplete="off" class="input min-w-0 flex-1" />
+		<button class="btn btn-brass focus-ring px-4 py-2 text-sm">Send</button>
+		<button formaction="?/clearBroadcast" class="btn btn-quiet focus-ring px-3 py-2 text-sm">Clear</button>
+	</form>
 
 	{#if flagged.length}
 		<div class="card mt-6 border-signal-amber/30 p-4">

@@ -171,6 +171,7 @@ export async function getCommitteeState(committee: Committee, delegate: Delegate
 
 	return {
 		status: committee.status,
+		announcement: (committee.rulesConfig as { announcement?: { text: string; at: string } } | null)?.announcement ?? null,
 		floor: {
 			mode: floorRow?.mode ?? 'closed',
 			currentSpeaker,

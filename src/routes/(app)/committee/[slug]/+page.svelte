@@ -47,6 +47,20 @@
 			/* ignore */
 		}
 	}
+
+	// Secretariat broadcast — arrives live via the poll; dismissal keyed by its
+	// timestamp so a new announcement re-appears.
+	let announcement = $state(data.state.announcement);
+	let annDismissed = $state('');
+	function dismissAnnouncement() {
+		if (!announcement) return;
+		annDismissed = announcement.at;
+		try {
+			localStorage.setItem('mimun-ann-dismissed', announcement.at);
+		} catch {
+			/* ignore */
+		}
+	}
 	const unreadNotes = $derived(notes.filter((n) => n.toId === me.id && !n.readAt).length);
 
 	async function markNotesRead() {
@@ -177,6 +191,7 @@
 		pendingMotions = u.pendingMotions;
 		points = u.points;
 		notes = u.notes;
+		announcement = u.announcement;
 	}
 
 	// Re-poll immediately after a floor-changing action so the room feels live.
@@ -221,6 +236,7 @@
 		pollLoop();
 		try {
 			if (!localStorage.getItem(`mimun-onboarding-v1-${me.id}`)) coachOpen = true;
+			annDismissed = localStorage.getItem('mimun-ann-dismissed') ?? '';
 		} catch {
 			/* ignore */
 		}
@@ -314,6 +330,14 @@
 			</div>
 		</div>
 	</div>
+
+	{#if announcement && announcement.at !== annDismissed}
+		<div class="flex shrink-0 items-center gap-3 border-b border-brass-600/30 bg-brass-500/[0.08] px-5 py-2.5 sm:px-6">
+			<span class="label label-brass shrink-0 text-[0.6rem]">Secretariat</span>
+			<p class="min-w-0 flex-1 truncate text-sm text-ink-100">{announcement.text}</p>
+			<button type="button" onclick={dismissAnnouncement} class="btn btn-quiet focus-ring shrink-0 px-2 py-1 text-xs" aria-label="Dismiss announcement">✕</button>
+		</div>
+	{/if}
 
 	<div class="grid flex-1 grid-cols-1 lg:min-h-0 lg:grid-cols-[1fr_400px]">
 		<!-- Chamber floor: chat -->
